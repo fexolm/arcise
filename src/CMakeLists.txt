@@ -1,0 +1,2 @@
+add_subdirectory(dialects)
+add_subdirectory(tools)
