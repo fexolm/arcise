@@ -4,5 +4,5 @@
 
 namespace arcise::dialects {
 using namespace mlir;
-#include "dialects/arrow/ArrowOpsDialect.h.inc"
-} // namespace arcise::dialiects
+#include "dialects/arrow/tablegen/ArrowOpsDialect.h.inc"
+} // namespace arcise::dialects

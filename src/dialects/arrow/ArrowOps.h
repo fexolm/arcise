@@ -7,5 +7,5 @@
 namespace arcise::dialects {
 using namespace mlir;
 #define GET_OP_CLASSES
-#include "dialects/arrow/ArrowOps.h.inc"
-} // namespace arcise::dialiects
+#include "dialects/arrow/tablegen/ArrowOps.h.inc"
+} // namespace arcise::dialects

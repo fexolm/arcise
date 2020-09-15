@@ -22,7 +22,7 @@ def Arrow_FooOp : Arrow_Op<"foo", [NoSideEffect, SameOperandsAndResultType]> {
         ```
     }];
 
-    let arguments = (ins I32:$input);
+    let arguments = (ins Arrow_ArrayType<I32>:$input);
     let results = (outs I32:$res);
 
     let assemblyFormat = [{

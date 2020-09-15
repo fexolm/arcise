@@ -20,7 +20,7 @@ RUN cmake --build . --target install -j 4
 
 # installing some development tools here in order to avoid rebuilding dependencies after
 # after each tool would be added
-RUN apt-get install -y --no-install-recommends clang-format gnome-keyring
+RUN apt-get install -y --no-install-recommends clang-format
 
 RUN useradd -ms /bin/bash docker
 

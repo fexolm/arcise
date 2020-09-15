@@ -12,6 +12,7 @@
 #include "llvm/Support/ToolOutputFile.h"
 
 #include "dialects/arrow/ArrowDialect.h"
+#include "dialects/arrow/ArrowTypes.h"
 
 int main(int argc, char **argv) {
   mlir::registerAllDialects();
