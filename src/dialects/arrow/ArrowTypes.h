@@ -3,19 +3,19 @@
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 
-namespace arcise::dialects {
+namespace arcise::dialects::arrow {
 namespace detail {
-class ArrayTypeStorage;
+class ChunkedArrayTypeStorage;
 } // namespace detail
 
-class ArrayType : public mlir::Type::TypeBase<ArrayType, mlir::Type,
-                                              detail::ArrayTypeStorage> {
-public:
+struct ChunkedArrayType
+    : public mlir::Type::TypeBase<ChunkedArrayType, mlir::Type,
+                                  detail::ChunkedArrayTypeStorage> {
   using Base::Base;
+  using ImplType = detail::ChunkedArrayTypeStorage;
 
-  static ArrayType get(mlir::MLIRContext *ctx, Type elementType);
+  static ChunkedArrayType get(mlir::MLIRContext *ctx, Type elementType);
 
   mlir::Type elementType() const;
 };
-
-} // namespace arcise::dialects
+} // namespace arcise::dialects::arrow

@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
   // TODO: Register arrow passes here.
 
   mlir::DialectRegistry registry;
-  registry.insert<arcise::dialects::ArrowDialect>();
+  registry.insert<arcise::dialects::arrow::ArrowDialect>();
   registry.insert<mlir::StandardOpsDialect>();
   // Add the following to include *all* MLIR Core dialects, or selectively
   // include what you need like above. You only need to register dialects that

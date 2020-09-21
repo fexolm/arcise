@@ -3,28 +3,32 @@
 #include <tuple>
 #include <utility>
 
-namespace arcise::dialects {
+namespace arcise::dialects::arrow {
 
 namespace detail {
-struct ArrayTypeStorage : public mlir::TypeStorage {
+struct ChunkedArrayTypeStorage : public mlir::TypeStorage {
   using KeyTy = std::tuple<mlir::Type>;
 
-  static ArrayTypeStorage *construct(mlir::TypeStorageAllocator &allocator,
-                                     const KeyTy &key) {
-    return new (allocator.allocate<ArrayTypeStorage>()) ArrayTypeStorage(key);
+  static ChunkedArrayTypeStorage *
+  construct(mlir::TypeStorageAllocator &allocator, const KeyTy &key) {
+    return new (allocator.allocate<ChunkedArrayTypeStorage>())
+        ChunkedArrayTypeStorage(key);
   }
 
   bool operator==(const KeyTy &key) const { return key == KeyTy(elementType); }
 
-  ArrayTypeStorage(const KeyTy &key) : elementType(std::get<0>(key)) {}
+  ChunkedArrayTypeStorage(const KeyTy &key) : elementType(std::get<0>(key)) {}
 
   mlir::Type elementType;
 };
 } // namespace detail
-ArrayType ArrayType::get(mlir::MLIRContext *ctx, Type elementType) {
+ChunkedArrayType ChunkedArrayType::get(mlir::MLIRContext *ctx,
+                                       Type elementType) {
   return Base::get(ctx, elementType);
 }
 
-mlir::Type ArrayType::elementType() const { return getImpl()->elementType; }
+mlir::Type ChunkedArrayType::elementType() const {
+  return getImpl()->elementType;
+}
 
-} // namespace arcise::dialects
+} // namespace arcise::dialects::arrow

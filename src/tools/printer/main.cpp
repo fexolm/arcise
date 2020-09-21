@@ -6,14 +6,16 @@
 #include "mlir/Pass/PassManager.h"
 
 #include "dialects/arrow/ArrowDialect.h"
+#include "dialects/arrow/ArrowOps.h"
 #include "dialects/arrow/ArrowTypes.h"
 
 int main(int argc, char **argv) {
+  namespace AD = arcise::dialects::arrow;
   mlir::registerAllDialects();
   mlir::registerAllPasses();
 
   mlir::DialectRegistry registry;
-  registry.insert<arcise::dialects::ArrowDialect>();
+  registry.insert<AD::ArrowDialect>();
   registry.insert<mlir::StandardOpsDialect>();
 
   mlir::MLIRContext ctx;
@@ -24,10 +26,13 @@ int main(int argc, char **argv) {
 
   mlir::ModuleOp module = mlir::ModuleOp::create(builder.getUnknownLoc());
 
-  auto input =
-      builder.getType<arcise::dialects::ArrayType>(builder.getI64Type());
+  auto in_arr = builder.getType<AD::ChunkedArrayType>(builder.getI32Type());
 
-  auto func = builder.getFunctionType({input}, {});
+  auto in_val = builder.getI64Type();
+
+  auto res = builder.getType<AD::ChunkedArrayType>(builder.getI1Type());
+
+  auto func = builder.getFunctionType({in_arr, in_val}, {res});
 
   auto funcOp = mlir::FuncOp::create(builder.getUnknownLoc(), "main", func);
 
@@ -35,9 +40,15 @@ int main(int argc, char **argv) {
 
   builder.setInsertionPointToStart(block);
 
+  auto eq = builder.create<AD::ConstGeOp>(builder.getUnknownLoc(), res,
+                                          funcOp.getArgument(0),
+                                          funcOp.getArgument(1));
+
   auto returnOp = builder.create<mlir::ReturnOp>(builder.getUnknownLoc());
 
+  eq.verify();
   module.push_back(funcOp);
+  module.verify();
 
   module.dump();
   return 0;
