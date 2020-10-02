@@ -5,17 +5,17 @@
 
 namespace arcise::dialects::arrow {
 namespace detail {
-class ChunkedArrayTypeStorage;
+class ArrayTypeStorage;
 } // namespace detail
 
-struct ChunkedArrayType
-    : public mlir::Type::TypeBase<ChunkedArrayType, mlir::Type,
-                                  detail::ChunkedArrayTypeStorage> {
+struct ArrayType : public mlir::Type::TypeBase<ArrayType, mlir::Type,
+                                               detail::ArrayTypeStorage> {
   using Base::Base;
-  using ImplType = detail::ChunkedArrayTypeStorage;
+  using ImplType = detail::ArrayTypeStorage;
 
-  static ChunkedArrayType get(mlir::MLIRContext *ctx, Type elementType);
+  static ArrayType get(mlir::MLIRContext *ctx, Type elementType, size_t length);
 
   mlir::Type elementType() const;
+  size_t length() const;
 };
 } // namespace arcise::dialects::arrow

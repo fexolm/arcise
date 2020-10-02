@@ -10,16 +10,17 @@ void ArrowDialect::initialize() {
 #include "dialects/arrow/tablegen/ArrowOps.cpp.inc"
 #undef GET_OP_LIST
       >();
-  addTypes<ChunkedArrayType>();
+  addTypes<ArrayType>();
 }
 
 mlir::Type ArrowDialect::parseType(mlir::DialectAsmParser &parser) const {}
 void ArrowDialect::printType(mlir::Type type,
                              mlir::DialectAsmPrinter &printer) const {
-  if (type.isa<ChunkedArrayType>()) {
-    auto arrayType = type.cast<ChunkedArrayType>();
+  if (type.isa<ArrayType>()) {
+    auto arrayType = type.cast<ArrayType>();
     printer.getStream() << "array<";
     printer.printType(arrayType.elementType());
+    printer.getStream() << ", " << arrayType.length();
     printer.getStream() << ">";
   }
 }

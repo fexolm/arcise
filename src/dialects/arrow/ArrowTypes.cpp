@@ -6,29 +6,32 @@
 namespace arcise::dialects::arrow {
 
 namespace detail {
-struct ChunkedArrayTypeStorage : public mlir::TypeStorage {
-  using KeyTy = std::tuple<mlir::Type>;
+struct ArrayTypeStorage : public mlir::TypeStorage {
+  using KeyTy = std::tuple<mlir::Type, size_t>;
 
-  static ChunkedArrayTypeStorage *
-  construct(mlir::TypeStorageAllocator &allocator, const KeyTy &key) {
-    return new (allocator.allocate<ChunkedArrayTypeStorage>())
-        ChunkedArrayTypeStorage(key);
+  static ArrayTypeStorage *construct(mlir::TypeStorageAllocator &allocator,
+                                     const KeyTy &key) {
+    return new (allocator.allocate<ArrayTypeStorage>()) ArrayTypeStorage(key);
   }
 
-  bool operator==(const KeyTy &key) const { return key == KeyTy(elementType); }
+  bool operator==(const KeyTy &key) const {
+    return key == KeyTy(elementType, length);
+  }
 
-  ChunkedArrayTypeStorage(const KeyTy &key) : elementType(std::get<0>(key)) {}
+  ArrayTypeStorage(const KeyTy &key)
+      : elementType(std::get<0>(key)), length(std::get<1>(key)) {}
 
   mlir::Type elementType;
+  size_t length;
 };
 } // namespace detail
-ChunkedArrayType ChunkedArrayType::get(mlir::MLIRContext *ctx,
-                                       Type elementType) {
-  return Base::get(ctx, elementType);
+ArrayType ArrayType::get(mlir::MLIRContext *ctx, Type elementType,
+                         size_t length) {
+  return Base::get(ctx, elementType, length);
 }
 
-mlir::Type ChunkedArrayType::elementType() const {
-  return getImpl()->elementType;
-}
+mlir::Type ArrayType::elementType() const { return getImpl()->elementType; }
+
+size_t ArrayType::length() const { return getImpl()->length; }
 
 } // namespace arcise::dialects::arrow

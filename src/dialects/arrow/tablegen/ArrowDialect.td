@@ -12,9 +12,9 @@ def Arrow_Dialect : Dialect {
 class Arrow_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<Arrow_Dialect, mnemonic, traits>;
 
-def Arrow_IsChunkedArrayType : CPred<"$_self.isa<arcise::dialects::arrow::ChunkedArrayType>()">;
+def Arrow_IsArrayType : CPred<"$_self.isa<arcise::dialects::arrow::ArrayType>()">;
 
-class Arrow_ChunkedArrayType<Type type> : DialectType<Arrow_Dialect, Arrow_IsChunkedArrayType, "Concrete array type">;
-def Arrow_AnyChunkedArrayType : DialectType<Arrow_Dialect, Arrow_IsChunkedArrayType, "Any array type">;
+class Arrow_ArrayType<Type type> : DialectType<Arrow_Dialect, Arrow_IsArrayType, "Concrete array type">;
+def Arrow_AnyArrayType : DialectType<Arrow_Dialect, Arrow_IsArrayType, "Any array type">;
 
 #endif // TABLEGEN_ARROW_DIALECT

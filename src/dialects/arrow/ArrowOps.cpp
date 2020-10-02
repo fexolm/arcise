@@ -2,6 +2,7 @@
 #include "dialects/arrow/ArrowDialect.h"
 #include "dialects/arrow/ArrowTypes.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/StandardTypes.h"
 
 namespace arcise::dialects::arrow {
 
@@ -11,10 +12,10 @@ mlir::LogicalResult verifySameArrayParamAndConstType(mlir::Operation *op) {
   }
   auto op0 = op->getOperand(0);
   auto op1 = op->getOperand(1);
-  if (!op0.getType().isa<ChunkedArrayType>()) {
-    return op->emitOpError() << "Expected first operand to be ChunkedArrayType";
+  if (!op0.getType().isa<ArrayType>()) {
+    return op->emitOpError() << "Expected first operand to be ArrayType";
   }
-  if (op1.getType() != op0.getType().cast<ChunkedArrayType>().elementType()) {
+  if (op1.getType() != op0.getType().cast<ArrayType>().elementType()) {
     return op->emitOpError()
            << "Expected constant to be the same type as array elements";
   }
@@ -27,11 +28,10 @@ mlir::LogicalResult verifyParamTypesAreSame(mlir::Operation *op) {
   }
   auto op0 = op->getOperand(0);
   auto op1 = op->getOperand(1);
-  if (!op0.getType().isa<ChunkedArrayType>() &&
-      op1.getType() == op0.getType()) {
-    return op->emitOpError()
-           << "Expected operands to be the same ChunkedArrayType";
+  if (!op0.getType().isa<ArrayType>() && op1.getType() == op0.getType()) {
+    return op->emitOpError() << "Expected operands to be the same ArrayType";
   }
+
   return mlir::success();
 }
 
