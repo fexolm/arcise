@@ -9,7 +9,7 @@
 
 namespace arcise::dialects::arrow {
 static mlir::MemRefType arrayToMemRef(ArrayType type) {
-  return mlir::MemRefType::get(type.length(), type.elementType());
+  return mlir::MemRefType::get(type.getLength(), type.getElementType());
 }
 
 static mlir::Value castToMemref(mlir::OpBuilder &builder,
@@ -18,8 +18,8 @@ static mlir::Value castToMemref(mlir::OpBuilder &builder,
     auto arrayType = val.getType().cast<ArrayType>();
     return builder.create<CastToMemrefOp>(
         val.getLoc(),
-        mlir::MemRefType::get({(int64_t)arrayType.length()},
-                              arrayType.elementType()),
+        mlir::MemRefType::get({(int64_t)arrayType.getLength()},
+                              arrayType.getElementType()),
         val);
   }
   return val;
@@ -49,7 +49,7 @@ struct BinaryOpLowering : public mlir::ConversionPattern {
     auto loc = op->getLoc();
 
     auto arrayType = (*op->operand_type_begin()).cast<ArrayType>();
-    mlir::Type nestedType = arrayType.elementType();
+    mlir::Type nestedType = arrayType.getElementType();
 
     auto resultType = (*op->result_type_begin()).cast<ArrayType>();
 
@@ -57,7 +57,7 @@ struct BinaryOpLowering : public mlir::ConversionPattern {
     auto alloc = insertAllocAndDealloc(memRefType, loc, rewriter);
 
     mlir::SmallVector<int64_t, 1> lbs(1, 0);
-    mlir::SmallVector<int64_t, 1> ubs(1, arrayType.length());
+    mlir::SmallVector<int64_t, 1> ubs(1, arrayType.getLength());
     mlir::SmallVector<int64_t, 1> steps(1, 1);
 
     typename BinaryOp::Adaptor binaryAdaptor(operands);
@@ -210,6 +210,7 @@ struct ArrowToAffineLoweringPass
     target.addIllegalDialect<ArrowDialect>();
     target.addLegalOp<FilterOp>();
     target.addLegalOp<CastToMemrefOp>();
+    target.addLegalOp<GetArrayOp>();
 
     mlir::OwningRewritePatternList patterns;
     patterns.insert<

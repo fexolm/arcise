@@ -10,7 +10,7 @@ void ArrowDialect::initialize() {
 #include "dialects/arrow/tablegen/ArrowOps.cpp.inc"
 #undef GET_OP_LIST
       >();
-  addTypes<ArrayType>();
+  addTypes<ArrayType, ColumnType>();
 }
 
 mlir::Type ArrowDialect::parseType(mlir::DialectAsmParser &parser) const {}
@@ -19,8 +19,15 @@ void ArrowDialect::printType(mlir::Type type,
   if (type.isa<ArrayType>()) {
     auto arrayType = type.cast<ArrayType>();
     printer.getStream() << "array<";
-    printer.printType(arrayType.elementType());
-    printer.getStream() << ", " << arrayType.length();
+    printer.printType(arrayType.getElementType());
+    printer.getStream() << ", length=" << arrayType.getLength();
+    printer.getStream() << ">";
+  }
+
+  if (type.isa<ColumnType>()) {
+    auto columnType = type.cast<ColumnType>();
+    printer.getStream() << "column<";
+    printer.printType(columnType.getElementType());
     printer.getStream() << ">";
   }
 }

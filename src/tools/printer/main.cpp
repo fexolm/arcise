@@ -5,15 +5,20 @@
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "llvm/Support/CommandLine.h"
 
 #include "dialects/arrow/ArrowDialect.h"
 #include "dialects/arrow/ArrowOps.h"
 #include "dialects/arrow/ArrowTypes.h"
 #include "dialects/arrow/passes/Passes.h"
-
 #include <iostream>
 
 int main(int argc, char **argv) {
+
+  mlir::registerMLIRContextCLOptions();
+  mlir::registerPassManagerCLOptions();
+  llvm::cl::ParseCommandLineOptions(argc, argv, "arcise\n");
+
   namespace AD = arcise::dialects::arrow;
   mlir::registerAllDialects();
   mlir::registerAllPasses();
@@ -26,54 +31,63 @@ int main(int argc, char **argv) {
 
   ctx.printStackTraceOnDiagnostic(true);
   ctx.printOpOnDiagnostic(true);
-
   registry.loadAll(&ctx);
 
-  mlir::PassManager pm(&ctx);
+  mlir::PassManager pm(&ctx, true);
+  pm.addPass(AD::createSplitColumnarOpsPass());
+
   pm.addPass(AD::createLowerToAffinePass());
-  pm.addPass(mlir::createCanonicalizerPass());
-  pm.addPass(mlir::createCSEPass());
   pm.addPass(mlir::createLoopFusionPass());
-  pm.addPass(mlir::createMemRefDataFlowOptPass());
+
+  pm.addPass(mlir::createCSEPass());
+  pm.addPass(mlir::createCanonicalizerPass());
 
   mlir::OpBuilder builder(&ctx);
 
-  mlir::ModuleOp module = mlir::ModuleOp::create(builder.getUnknownLoc());
+  auto loc = builder.getUnknownLoc();
 
-  auto in_arr = builder.getType<AD::ArrayType>(builder.getI64Type(), 15);
+  mlir::ModuleOp module = mlir::ModuleOp::create(loc);
 
-  auto in_val = builder.getI64Type();
+  std::vector<size_t> sizes = {128, 128, 64};
 
-  auto res = builder.getType<AD::ArrayType>(builder.getI1Type(), 15);
+  auto resType = builder.getType<AD::ColumnType>(builder.getI1Type(), 3, sizes);
 
-  auto func = builder.getFunctionType({in_arr, in_val}, {});
+  auto columnsType =
+      builder.getType<AD::ColumnType>(builder.getI64Type(), 3, sizes);
 
-  auto funcOp = mlir::FuncOp::create(builder.getUnknownLoc(), "main", func);
+  auto func = builder.getFunctionType({}, {});
+
+  auto funcOp = builder.create<mlir::FuncOp>(loc, "f", func);
 
   auto block = funcOp.addEntryBlock();
 
   builder.setInsertionPointToStart(block);
 
-  auto eq1 = builder.create<AD::ConstGeOp>(builder.getUnknownLoc(), res,
-                                           funcOp.getArgument(0),
-                                           funcOp.getArgument(1));
+  auto c1 = builder.create<AD::GetColumnOp>(loc, columnsType, 1);
 
-  auto eq2 = builder.create<AD::ConstGeOp>(builder.getUnknownLoc(), res,
-                                           funcOp.getArgument(0),
-                                           funcOp.getArgument(1));
+  auto c2 = builder.create<AD::GetColumnOp>(loc, columnsType, 2);
 
-  builder.create<AD::OrOp>(builder.getUnknownLoc(), res, eq1, eq2);
+  auto c3 = builder.create<AD::GetColumnOp>(loc, columnsType, 3);
 
-  auto returnOp = builder.create<mlir::ReturnOp>(builder.getUnknownLoc());
+  mlir::Value res = builder.create<AD::SumOp>(loc, columnsType, c1, c2);
+
+  res = builder.create<AD::ConstMulOp>(
+      loc, columnsType, res,
+      builder.create<mlir::ConstantOp>(loc, builder.getI64Type(),
+                                       builder.getI64IntegerAttr(5)));
+
+  res = builder.create<AD::GeOp>(loc, resType, c3, res);
+
+  builder.create<mlir::ReturnOp>(builder.getUnknownLoc());
+  // auto returnOp =
+  //     builder.create<mlir::ReturnOp>(builder.getUnknownLoc(), resType, res);
 
   module.push_back(funcOp);
-  module.verify();
 
-  module.dump();
+  mlir::applyPassManagerCLOptions(pm);
 
   if (mlir::failed(pm.run(module)))
     std::cerr << "FAIL" << std::endl;
 
-  module.dump();
   return 0;
 }
