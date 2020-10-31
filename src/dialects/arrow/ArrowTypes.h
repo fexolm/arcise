@@ -26,11 +26,9 @@ struct ColumnType : public mlir::Type::TypeBase<ColumnType, mlir::Type,
   using ImplType = detail::ColumnTypeStorage;
 
   static ColumnType get(mlir::MLIRContext *ctx, mlir::Type elementType,
-                        size_t chunksCount,
-                        mlir::ArrayRef<size_t> chunkLengths);
+                        mlir::ArrayRef<ArrayType> chunks);
 
   mlir::Type getElementType() const;
-  size_t getChunksCount() const;
-  mlir::ArrayRef<size_t> getChunkLengths() const;
+  mlir::ArrayRef<ArrayType> getChunks() const;
 };
 } // namespace arcise::dialects::arrow

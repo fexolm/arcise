@@ -57,10 +57,21 @@ int main(int argc, char **argv) {
 
   std::vector<size_t> sizes = {123412, 12342, 43223};
 
-  auto resType = builder.getType<AD::ColumnType>(builder.getI1Type(), 3, sizes);
+  std::vector<AD::ArrayType> resArrays;
+  std::vector<AD::ArrayType> colArrays;
+
+  for (auto size : sizes) {
+    resArrays.push_back(
+        builder.getType<AD::ArrayType>(builder.getI1Type(), size));
+    colArrays.push_back(
+        builder.getType<AD::ArrayType>(builder.getI64Type(), size));
+  }
+
+  auto resType =
+      builder.getType<AD::ColumnType>(builder.getI1Type(), resArrays);
 
   auto columnsType =
-      builder.getType<AD::ColumnType>(builder.getI64Type(), 3, sizes);
+      builder.getType<AD::ColumnType>(builder.getI64Type(), colArrays);
 
   auto func = builder.getFunctionType({}, {});
 

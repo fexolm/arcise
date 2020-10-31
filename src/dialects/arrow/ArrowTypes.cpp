@@ -26,7 +26,7 @@ struct ArrayTypeStorage : public mlir::TypeStorage {
 };
 
 struct ColumnTypeStorage : public mlir::TypeStorage {
-  using KeyTy = std::tuple<mlir::Type, size_t, mlir::ArrayRef<size_t>>;
+  using KeyTy = std::tuple<mlir::Type, mlir::ArrayRef<ArrayType>>;
 
   static ColumnTypeStorage *construct(mlir::TypeStorageAllocator &allocator,
                                       const KeyTy &key) {
@@ -34,16 +34,14 @@ struct ColumnTypeStorage : public mlir::TypeStorage {
   }
 
   bool operator==(const KeyTy &key) const {
-    return key == KeyTy(elementType, chunksCount, chunkLengths);
+    return key == KeyTy(elementType, chunks);
   }
 
   ColumnTypeStorage(const KeyTy &key)
-      : elementType(std::get<0>(key)), chunksCount(std::get<1>(key)),
-        chunkLengths(std::get<2>(key)) {}
+      : elementType(std::get<0>(key)), chunks(std::get<1>(key)) {}
 
   mlir::Type elementType;
-  size_t chunksCount;
-  std::vector<size_t> chunkLengths;
+  std::vector<ArrayType> chunks;
 };
 } // namespace detail
 ArrayType ArrayType::get(mlir::MLIRContext *ctx, Type elementType,
@@ -56,16 +54,13 @@ mlir::Type ArrayType::getElementType() const { return getImpl()->elementType; }
 size_t ArrayType::getLength() const { return getImpl()->length; }
 
 ColumnType ColumnType::get(mlir::MLIRContext *ctx, Type elementType,
-                           size_t chunksCount,
-                           mlir::ArrayRef<size_t> chunkLengths) {
-  return Base::get(ctx, elementType, chunksCount, chunkLengths);
+                           mlir::ArrayRef<ArrayType> chunks) {
+  return Base::get(ctx, elementType, chunks);
 }
 mlir::Type ColumnType::getElementType() const { return getImpl()->elementType; }
 
-size_t ColumnType::getChunksCount() const { return getImpl()->chunksCount; }
-
-mlir::ArrayRef<size_t> ColumnType::getChunkLengths() const {
-  return getImpl()->chunkLengths;
+mlir::ArrayRef<ArrayType> ColumnType::getChunks() const {
+  return getImpl()->chunks;
 }
 
 } // namespace arcise::dialects::arrow

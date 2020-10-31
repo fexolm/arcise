@@ -57,7 +57,7 @@ mlir::LogicalResult verifyParamTypesAreSame(mlir::Operation *op) {
         return op->emitOpError()
                << "Expected both operands to have the same elements type";
       }
-      if (lhs.getChunksCount() != rhs.getChunksCount()) {
+      if (lhs.getChunks().size() != rhs.getChunks().size()) {
         return op->emitOpError()
                << "Expected both operands to have the same chunks count";
       }

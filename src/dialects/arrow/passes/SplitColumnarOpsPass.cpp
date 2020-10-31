@@ -31,27 +31,24 @@ public:
     }
     mlir::Type resultColumnType = op.res().getType();
 
-    auto resultElementType =
-        resultColumnType.cast<ColumnType>().getElementType();
+    auto resultType = resultColumnType.cast<ColumnType>();
 
     typename Op::Adaptor binaryAdaptor(op.getOperands());
 
     auto res = rewriter.create<CreateEmptyColumnOp>(loc, columnType);
-    for (int i = 0; i < columnType.getChunksCount(); i++) {
-      auto chunkType = rewriter.getType<ArrayType>(
-          columnType.getElementType(), columnType.getChunkLengths()[i]);
-
-      auto resultType = rewriter.getType<ArrayType>(
-          resultElementType, columnType.getChunkLengths()[i]);
+    for (int i = 0; i < columnType.getChunks().size(); i++) {
+      auto chunkType = columnType.getChunks()[i];
 
       auto lhs =
           rewriter.create<GetChunkOp>(loc, chunkType, binaryAdaptor.lhs(), i);
       mlir::Value rhs = binaryAdaptor.rhs();
       if (rhs.getType().isa<ColumnType>()) {
-        rhs = rewriter.create<GetChunkOp>(loc, resultType, rhs, i);
+        rhs =
+            rewriter.create<GetChunkOp>(loc, resultType.getChunks()[i], rhs, i);
       }
       rewriter.create<SetChunkOp>(
-          loc, res, i, rewriter.create<Op>(loc, resultType, lhs, rhs));
+          loc, res, i,
+          rewriter.create<Op>(loc, resultType.getChunks()[i], lhs, rhs));
     }
     rewriter.replaceOp(op, {res});
     return mlir::success();
@@ -86,7 +83,7 @@ struct SplitColumnarOpsPass
         std::vector<mlir::Value> chunks;
         columnToChunks.push_back(
             {col,
-             std::vector<mlir::Value>(columnType.getChunksCount(), nullptr)});
+             std::vector<mlir::Value>(columnType.getChunks().size(), nullptr)});
         opsToErase.push_back(op);
       }
 
@@ -97,9 +94,8 @@ struct SplitColumnarOpsPass
         auto columnType = col.getType().cast<ColumnType>();
         std::vector<mlir::Value> chunks;
 
-        for (int i = 0; i < columnType.getChunksCount(); i++) {
-          auto arrayType = builder.getType<ArrayType>(
-              columnType.getElementType(), columnType.getChunkLengths()[i]);
+        for (int i = 0; i < columnType.getChunks().size(); i++) {
+          auto arrayType = columnType.getChunks()[i];
 
           chunks.push_back(
               builder.create<GetArrayOp>(op->getLoc(), arrayType, name, i));
