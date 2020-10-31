@@ -19,10 +19,11 @@ mlir::LogicalResult verifySameArrayParamAndConstType(mlir::Operation *op) {
              << "Expected constant to be the same type as array elements";
     }
   } else if (auto lhs = op0.dyn_cast_or_null<ColumnType>()) {
-    if (op1 != lhs.getElementType()) {
+    if (lhs.getChunksCount() && op1 != lhs.getChunk(0).getElementType()) {
       return op->emitOpError()
              << "Expected constant to be the same type as column elements";
     }
+
   } else {
     return op->emitOpError()
            << "Expected first operand to be ArrayType or ColumnType";
@@ -53,13 +54,9 @@ mlir::LogicalResult verifyParamTypesAreSame(mlir::Operation *op) {
     }
   } else if (auto lhs = op0.dyn_cast_or_null<ColumnType>()) {
     if (auto rhs = op1.dyn_cast_or_null<ColumnType>()) {
-      if (lhs.getElementType() != rhs.getElementType()) {
+      if (lhs.getChunks() != rhs.getChunks()) {
         return op->emitOpError()
                << "Expected both operands to have the same elements type";
-      }
-      if (lhs.getChunks().size() != rhs.getChunks().size()) {
-        return op->emitOpError()
-               << "Expected both operands to have the same chunks count";
       }
     } else {
       return op->emitOpError() << "Expected both operands to be column types";

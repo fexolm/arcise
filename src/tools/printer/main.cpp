@@ -40,14 +40,13 @@ int main(int argc, char **argv) {
   pm.addPass(AD::createSplitColumnarOpsPass());
   pm.addPass(AD::createLowerToAffinePass());
 
-  pm.addPass(mlir::createLoopFusionPass());
-  pm.addPass(mlir::createMemRefDataFlowOptPass());
+  //   pm.addPass(mlir::createLoopFusionPass());
+  //   pm.addPass(mlir::createMemRefDataFlowOptPass());
 
-  pm.addPass(mlir::createCSEPass());
-  pm.addPass(mlir::createCanonicalizerPass());
+  //   pm.addPass(mlir::createCSEPass());
+  //   pm.addPass(mlir::createCanonicalizerPass());
 
-  // pm.addPass(mlir::createAffineParallelizePass());
-  pm.addPass(mlir::createSuperVectorizePass(256));
+  //   pm.addPass(mlir::createSuperVectorizePass(256));
 
   mlir::OpBuilder builder(&ctx);
 
@@ -57,8 +56,8 @@ int main(int argc, char **argv) {
 
   std::vector<size_t> sizes = {123412, 12342, 43223};
 
-  std::vector<AD::ArrayType> resArrays;
-  std::vector<AD::ArrayType> colArrays;
+  std::vector<mlir::Type> resArrays;
+  std::vector<mlir::Type> colArrays;
 
   for (auto size : sizes) {
     resArrays.push_back(
@@ -67,13 +66,18 @@ int main(int argc, char **argv) {
         builder.getType<AD::ArrayType>(builder.getI64Type(), size));
   }
 
-  auto resType =
+  mlir::Type resType =
       builder.getType<AD::ColumnType>(builder.getI1Type(), resArrays);
 
-  auto columnsType =
+  mlir::Type columnsType =
       builder.getType<AD::ColumnType>(builder.getI64Type(), colArrays);
 
-  auto func = builder.getFunctionType({}, {});
+  auto tableInType = AD::TableType::get(
+      &ctx, {"a", "b", "c"}, {columnsType, columnsType, columnsType});
+
+  auto tableOutType = AD::TableType::get(&ctx, {"res"}, {resType});
+
+  auto func = builder.getFunctionType({tableInType}, {tableOutType});
 
   auto funcOp = builder.create<mlir::FuncOp>(loc, "f", func);
 
@@ -81,11 +85,13 @@ int main(int argc, char **argv) {
 
   builder.setInsertionPointToStart(block);
 
-  auto c1 = builder.create<AD::GetColumnOp>(loc, columnsType, "a");
+  auto tableIn = funcOp.getArgument(0);
 
-  auto c2 = builder.create<AD::GetColumnOp>(loc, columnsType, "b");
+  auto c1 = builder.create<AD::GetColumnOp>(loc, columnsType, tableIn, "a");
 
-  auto c3 = builder.create<AD::GetColumnOp>(loc, columnsType, "c");
+  auto c2 = builder.create<AD::GetColumnOp>(loc, columnsType, tableIn, "b");
+
+  auto c3 = builder.create<AD::GetColumnOp>(loc, columnsType, tableIn, "c");
 
   mlir::Value res = builder.create<AD::SumOp>(loc, columnsType, c1, c2);
 
@@ -96,9 +102,10 @@ int main(int argc, char **argv) {
 
   res = builder.create<AD::GeOp>(loc, resType, c3, res);
 
-  builder.create<AD::ReturnColumnOp>(loc, res, "res");
+  mlir::Value tableRes =
+      builder.create<AD::MakeTableOp>(loc, tableOutType, res);
 
-  builder.create<mlir::ReturnOp>(loc);
+  builder.create<mlir::ReturnOp>(loc, tableRes);
 
   module.push_back(funcOp);
 

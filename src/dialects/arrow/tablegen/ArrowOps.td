@@ -209,84 +209,53 @@ def Arrow_FilterOp : Arrow_Op<"filter", [NoSideEffect]> {
 
 // ==== OTHER OPERATIONS ====
 
-def Arrow_CastToMemrefOp : Arrow_Op<"array_to_memref_cast", [NoSideEffect]> {
-    let summary = [{
-        cast array to memref
-    }];
-    let arguments = (ins Arrow_AnyArrayType:$arr);
-    let results = (outs AnyMemRef: $res);
-}
-
-def Arrow_CastMemrefToArrayOp : Arrow_Op<"memref_to_array_cast", [NoSideEffect]> {
-    let summary = [{
-        cast array to memref
-    }];
-    let arguments = (ins AnyMemRef:$mem);
-    let results = (outs Arrow_AnyArrayType: $res);
-}
-
-def Arrow_ConstArrayOp : Arrow_Op<"const_array", [NoSideEffect]> {
-    let summary = [{
-        creates const array from memrefs
-    }];
-    let arguments = (ins AnyMemRef:$null_bitmap, AnyMemRef: $value_buffer);
-    let results = (outs Arrow_AnyArrayType: $res);
-}
-
 def Arrow_GetColumnOp : Arrow_Op<"get_column", [NoSideEffect]> {
     let summary = [{
         return column by index from table 
     }];
-    let arguments = (ins StrAttr: $name);
+    let arguments = (ins Arrow_TableType: $table, StrAttr: $name);
     let results = (outs Arrow_AnyColumnType: $res);
 }
 
-def Arrow_GetArrayOp : Arrow_Op<"get_array", [NoSideEffect]> {
+def Arrow_UnwrapArrayOp : Arrow_Op<"unwrap_array", [NoSideEffect]> {
     let summary = [{
-        returns array from table
+        return array's buffers
     }];
-    let arguments = (ins StrAttr: $col, I64Attr: $idx);
-    let results = (outs Arrow_AnyArrayType: $res);
+    let arguments = (ins Arrow_AnyArrayType: $arr);
+    let results = (outs AnyMemRef: $null_bitmap,
+                        AnyMemRef: $data_buffer);
 }
 
-def Arrow_GetChunkOp : Arrow_Op<"get_chunk", [NoSideEffect]> {
+def Arrow_UnwrapColumnOp : Arrow_Op<"unwrap_column", [NoSideEffect]> {
     let summary = [{
-        return chunk from column
+        return column's chunks
     }];
-    let arguments = (ins Arrow_AnyColumnType: $col, I64Attr: $idx);
-    let results = (outs Arrow_AnyArrayType: $res);
+    let arguments = (ins Arrow_AnyColumnType: $col);
+    let results = (outs Variadic<Arrow_AnyArrayType>: $res);
 }
 
-def Arrow_SetChunkOp : Arrow_Op<"set_chunk", []> {
+def Arrow_MakeArrayOp : Arrow_Op<"make_array", [NoSideEffect]> {
     let summary = [{
-        set i'th chunk
+        construct array from buffers
     }];
-    let arguments = (ins Arrow_AnyColumnType: $col, I64Attr: $idx, Arrow_AnyArrayType: $arr);
-    let results = (outs);
+    let arguments = (ins I1MemRef: $null_bitmap, AnyMemRef: $data_buffer);
+    let results = (outs Arrow_AnyArrayType: $arr);
 }
 
-def Arrow_CreateEmptyColumnOp : Arrow_Op<"create_empty_column", [NoSideEffect]> {
+def Arrow_MakeColumnOp : Arrow_Op<"make_column", [NoSideEffect]> {
     let summary = [{
-        allocates column
+        make column from arrays
     }];
-    let arguments = (outs);
+    let arguments = (ins Variadic<Arrow_AnyArrayType>: $chunks);
     let results = (outs Arrow_AnyColumnType: $res);
 }
 
-def Arrow_ReturnColumnOp : Arrow_Op<"return_column", []> {
+def Arrow_MakeTableOp : Arrow_Op<"make_table", [NoSideEffect]> {
     let summary = [{
-        return resulting column
+        make table from columns
     }];
-    let arguments = (ins Arrow_AnyColumnType: $col, StrAttr: $name);
-    let results = (outs);
-}
-
-def Arrow_ReturnArrayOp : Arrow_Op<"return_array", []> {
-    let summary = [{
-        return resulting array
-    }];
-    let arguments = (ins Arrow_AnyArrayOrMemref: $arr, StrAttr: $col, I64Attr: $idx);
-    let results = (outs);
+    let arguments = (ins Variadic<Arrow_AnyColumnType>: $columns);
+    let results = (outs Arrow_TableType: $res);
 }
 
 

@@ -8,22 +8,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace arcise::dialects::arrow {
-static mlir::MemRefType arrayToMemRef(ArrayType type) {
-  return mlir::MemRefType::get(type.getLength(), type.getElementType());
-}
-
-static mlir::Value castToMemref(mlir::OpBuilder &builder,
-                                const mlir::Value &val) {
-  if (val.getType().isa<ArrayType>()) {
-    auto arrayType = val.getType().cast<ArrayType>();
-    return builder.create<CastToMemrefOp>(
-        val.getLoc(),
-        mlir::MemRefType::get({(int64_t)arrayType.getLength()},
-                              arrayType.getElementType()),
-        val);
-  }
-  return val;
-}
 
 static mlir::Value insertAllocAndDealloc(mlir::MemRefType type,
                                          mlir::Location loc,
@@ -49,39 +33,85 @@ struct BinaryOpLowering : public mlir::ConversionPattern {
     auto loc = op->getLoc();
 
     auto arrayType = (*op->operand_type_begin()).cast<ArrayType>();
-    mlir::Type nestedType = arrayType.getElementType();
-
     auto resultType = (*op->result_type_begin()).cast<ArrayType>();
-
-    auto memRefType = arrayToMemRef(resultType);
-    auto alloc = insertAllocAndDealloc(memRefType, loc, rewriter);
 
     mlir::SmallVector<int64_t, 1> lbs(1, 0);
     mlir::SmallVector<int64_t, 1> ubs(1, arrayType.getLength());
     mlir::SmallVector<int64_t, 1> steps(1, 1);
 
     typename BinaryOp::Adaptor binaryAdaptor(operands);
-    auto lhs = castToMemref(rewriter, binaryAdaptor.lhs());
-    auto rhs = castToMemref(rewriter, binaryAdaptor.rhs());
-    mlir::buildAffineLoopNest(
-        rewriter, loc, lbs, ubs, steps,
-        [&](mlir::OpBuilder &builder, mlir::Location loc,
-            mlir::ValueRange ivs) {
-          auto loadedLhs = builder.create<mlir::AffineLoadOp>(loc, lhs, ivs);
+    mlir::Value lhs = binaryAdaptor.lhs();
+    mlir::Value rhs = binaryAdaptor.rhs();
 
-          mlir::Value loadedRhs;
-          if (IsConst) {
-            loadedRhs = rhs;
-          } else {
-            loadedRhs = builder.create<mlir::AffineLoadOp>(loc, rhs, ivs);
-          }
+    auto nullBitmapType =
+        mlir::MemRefType::get(arrayType.getLength(), rewriter.getI1Type());
 
-          mlir::Value valueToStore = LoweredBinaryOpBuilder::create(
-              nestedType.isIntOrIndex(), builder, loc, loadedLhs, loadedRhs);
-          auto store_op = builder.create<mlir::AffineStoreOp>(loc, valueToStore,
-                                                              alloc, ivs);
-        });
-    rewriter.replaceOp(op, alloc);
+    auto dataBufferType = mlir::MemRefType::get(arrayType.getLength(),
+                                                arrayType.getElementType());
+
+    auto resultBufferType = mlir::MemRefType::get(resultType.getLength(),
+                                                  resultType.getElementType());
+
+    auto unwrapLhs = rewriter.create<UnwrapArrayOp>(loc, nullBitmapType,
+                                                    dataBufferType, lhs);
+
+    auto lhsBuffer = unwrapLhs.data_buffer();
+    auto lhsBitmap = unwrapLhs.null_bitmap();
+
+    mlir::Value resultBuffer =
+        insertAllocAndDealloc(resultBufferType, loc, rewriter);
+    mlir::Value resultBitmap;
+    if (rhs.getType().isa<ArrayType>()) {
+      auto unwrapRhs = rewriter.create<UnwrapArrayOp>(loc, nullBitmapType,
+                                                      dataBufferType, rhs);
+      auto rhsBuffer = unwrapLhs.data_buffer();
+      auto rhsBitmap = unwrapLhs.null_bitmap();
+      resultBitmap = insertAllocAndDealloc(nullBitmapType, loc, rewriter);
+
+      mlir::buildAffineLoopNest(
+          rewriter, loc, lbs, ubs, steps,
+          [&](mlir::OpBuilder &builder, mlir::Location loc,
+              mlir::ValueRange ivs) {
+            auto loadedLhsBuffer =
+                builder.create<mlir::AffineLoadOp>(loc, lhsBuffer, ivs);
+            auto loadedRhsBuffer =
+                builder.create<mlir::AffineLoadOp>(loc, rhsBuffer, ivs);
+
+            mlir::Value bufferResult = LoweredBinaryOpBuilder::create(
+                arrayType.getElementType().isIntOrIndex(), builder, loc,
+                loadedLhsBuffer, loadedRhsBuffer);
+            builder.create<mlir::AffineStoreOp>(loc, bufferResult, resultBuffer,
+                                                ivs);
+
+            auto loadedLhsBitmap =
+                builder.create<mlir::AffineLoadOp>(loc, lhsBitmap, ivs);
+            auto loadedRhsBitmap =
+                builder.create<mlir::AffineLoadOp>(loc, rhsBitmap, ivs);
+
+            mlir::Value bitmapResult = builder.create<mlir::AndOp>(
+                loc, builder.getI1Type(), loadedLhsBitmap, loadedRhsBitmap);
+
+            builder.create<mlir::AffineStoreOp>(loc, bitmapResult, resultBitmap,
+                                                ivs);
+          });
+    } else {
+      mlir::buildAffineLoopNest(
+          rewriter, loc, lbs, ubs, steps,
+          [&](mlir::OpBuilder &builder, mlir::Location loc,
+              mlir::ValueRange ivs) {
+            auto loadedLhsBuffer =
+                builder.create<mlir::AffineLoadOp>(loc, lhsBuffer, ivs);
+            mlir::Value bufferResult = LoweredBinaryOpBuilder::create(
+                arrayType.getElementType().isIntOrIndex(), builder, loc,
+                loadedLhsBuffer, rhs);
+            builder.create<mlir::AffineStoreOp>(loc, bufferResult, resultBuffer,
+                                                ivs);
+          });
+      resultBitmap = lhsBitmap;
+    }
+
+    rewriter.replaceOp(op, {rewriter.create<MakeArrayOp>(
+                               loc, resultType, resultBitmap, resultBuffer)});
     return mlir::success();
   }
 };
@@ -208,11 +238,13 @@ struct ArrowToAffineLoweringPass
     target.addLegalDialect<mlir::AffineDialect, mlir::StandardOpsDialect>();
 
     target.addIllegalDialect<ArrowDialect>();
-    target.addLegalOp<FilterOp>();
-    target.addLegalOp<CastToMemrefOp>();
-    target.addLegalOp<CastMemrefToArrayOp>();
-    target.addLegalOp<GetArrayOp>();
-    target.addLegalOp<ReturnArrayOp>();
+    // target.addLegalOp<FilterOp>();
+    target.addLegalOp<GetColumnOp>();
+    target.addLegalOp<UnwrapArrayOp>();
+    target.addLegalOp<UnwrapColumnOp>();
+    target.addLegalOp<MakeArrayOp>();
+    target.addLegalOp<MakeColumnOp>();
+    target.addLegalOp<MakeTableOp>();
 
     mlir::OwningRewritePatternList patterns;
     patterns.insert<
@@ -231,21 +263,33 @@ struct ArrowToAffineLoweringPass
     if (failed(applyPartialConversion(getFunction(), target, patterns)))
       signalPassFailure();
 
-    std::vector<mlir::Operation *> deallocsToErase;
+    std::vector<mlir::Value> resultArrays;
 
     function.walk([&](mlir::Operation *op) {
-      if (auto deallocOp = mlir::dyn_cast<mlir::DeallocOp>(op)) {
-        // remove dealloc if array is returned
-        if (llvm::any_of(deallocOp.memref().getUsers(),
-                         [&](Operation *ownerOp) {
-                           return isa<ReturnArrayOp>(ownerOp);
-                         })) {
-          deallocsToErase.push_back(op);
+      if (auto returnOp = mlir::dyn_cast<mlir::ReturnOp>(op)) {
+        mlir::Value tableResult = returnOp.getOperand(0);
+        for (auto col : tableResult.getDefiningOp()->getOperands()) {
+          for (auto arr : col.getDefiningOp()->getOperands()) {
+            for (auto memref : arr.getDefiningOp()->getOperands()) {
+              resultArrays.push_back(memref);
+            }
+          }
         }
       }
     });
 
-    for (auto &op : deallocsToErase) {
+    std::vector<mlir::Operation *> opsToErase;
+    function.walk([&](mlir::Operation *op) {
+      if (auto deallocOp = mlir::dyn_cast<mlir::DeallocOp>(op)) {
+        auto operand = op->getOperand(0);
+        if (std::any_of(resultArrays.begin(), resultArrays.end(),
+                        [&](auto &arr) { return operand == arr; })) {
+          opsToErase.push_back(op);
+        }
+      }
+    });
+
+    for (auto &op : opsToErase) {
       op->erase();
     }
   }
