@@ -210,7 +210,9 @@ struct ArrowToAffineLoweringPass
     target.addIllegalDialect<ArrowDialect>();
     target.addLegalOp<FilterOp>();
     target.addLegalOp<CastToMemrefOp>();
+    target.addLegalOp<CastMemrefToArrayOp>();
     target.addLegalOp<GetArrayOp>();
+    target.addLegalOp<ReturnArrayOp>();
 
     mlir::OwningRewritePatternList patterns;
     patterns.insert<
@@ -228,6 +230,24 @@ struct ArrowToAffineLoweringPass
     // operations were not converted successfully.
     if (failed(applyPartialConversion(getFunction(), target, patterns)))
       signalPassFailure();
+
+    std::vector<mlir::Operation *> deallocsToErase;
+
+    function.walk([&](mlir::Operation *op) {
+      if (auto deallocOp = mlir::dyn_cast<mlir::DeallocOp>(op)) {
+        // remove dealloc if array is returned
+        if (llvm::any_of(deallocOp.memref().getUsers(),
+                         [&](Operation *ownerOp) {
+                           return isa<ReturnArrayOp>(ownerOp);
+                         })) {
+          deallocsToErase.push_back(op);
+        }
+      }
+    });
+
+    for (auto &op : deallocsToErase) {
+      op->erase();
+    }
   }
 };
 std::unique_ptr<Pass> createLowerToAffinePass() {

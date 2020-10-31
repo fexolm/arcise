@@ -34,13 +34,20 @@ int main(int argc, char **argv) {
   registry.loadAll(&ctx);
 
   mlir::PassManager pm(&ctx, true);
-  pm.addPass(AD::createSplitColumnarOpsPass());
+  pm.addPass(mlir::createCSEPass());
+  pm.addPass(mlir::createCanonicalizerPass());
 
+  pm.addPass(AD::createSplitColumnarOpsPass());
   pm.addPass(AD::createLowerToAffinePass());
+
   pm.addPass(mlir::createLoopFusionPass());
+  pm.addPass(mlir::createMemRefDataFlowOptPass());
 
   pm.addPass(mlir::createCSEPass());
   pm.addPass(mlir::createCanonicalizerPass());
+
+  // pm.addPass(mlir::createAffineParallelizePass());
+  pm.addPass(mlir::createSuperVectorizePass(256));
 
   mlir::OpBuilder builder(&ctx);
 
@@ -48,7 +55,7 @@ int main(int argc, char **argv) {
 
   mlir::ModuleOp module = mlir::ModuleOp::create(loc);
 
-  std::vector<size_t> sizes = {128, 128, 64};
+  std::vector<size_t> sizes = {123412, 12342, 43223};
 
   auto resType = builder.getType<AD::ColumnType>(builder.getI1Type(), 3, sizes);
 
@@ -63,11 +70,11 @@ int main(int argc, char **argv) {
 
   builder.setInsertionPointToStart(block);
 
-  auto c1 = builder.create<AD::GetColumnOp>(loc, columnsType, 1);
+  auto c1 = builder.create<AD::GetColumnOp>(loc, columnsType, "a");
 
-  auto c2 = builder.create<AD::GetColumnOp>(loc, columnsType, 2);
+  auto c2 = builder.create<AD::GetColumnOp>(loc, columnsType, "b");
 
-  auto c3 = builder.create<AD::GetColumnOp>(loc, columnsType, 3);
+  auto c3 = builder.create<AD::GetColumnOp>(loc, columnsType, "c");
 
   mlir::Value res = builder.create<AD::SumOp>(loc, columnsType, c1, c2);
 
@@ -78,9 +85,9 @@ int main(int argc, char **argv) {
 
   res = builder.create<AD::GeOp>(loc, resType, c3, res);
 
-  builder.create<mlir::ReturnOp>(builder.getUnknownLoc());
-  // auto returnOp =
-  //     builder.create<mlir::ReturnOp>(builder.getUnknownLoc(), resType, res);
+  builder.create<AD::ReturnColumnOp>(loc, res, "res");
+
+  builder.create<mlir::ReturnOp>(loc);
 
   module.push_back(funcOp);
 

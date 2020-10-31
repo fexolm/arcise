@@ -23,4 +23,6 @@ def Arrow_AnyColumnType : DialectType<Arrow_Dialect, Arrow_IsColumnType, "Any ar
 class Arrow_ArrayOrColumnType<Type type> : DialectType<Arrow_Dialect, Or<[Arrow_IsColumnType, Arrow_IsArrayType]>, "Array or column">;
 def Arrow_AnyArrayOrColumnType: DialectType<Arrow_Dialect, Or<[Arrow_IsColumnType, Arrow_IsArrayType]>, "Array or column">;
 
+def Arrow_AnyArrayOrMemref: DialectType<Arrow_Dialect, Or<[IsMemRefTypePred, Arrow_IsArrayType]>, "Array or memref">;
+
 #endif // TABLEGEN_ARROW_DIALECT

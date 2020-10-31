@@ -207,12 +207,22 @@ def Arrow_FilterOp : Arrow_Op<"filter", [NoSideEffect]> {
     let results = (outs Arrow_AnyArrayOrColumnType:$res);
 }
 
-def Arrow_CastToMemrefOp : Arrow_Op<"memref_cast", [NoSideEffect]> {
+// ==== OTHER OPERATIONS ====
+
+def Arrow_CastToMemrefOp : Arrow_Op<"array_to_memref_cast", [NoSideEffect]> {
     let summary = [{
         cast array to memref
     }];
     let arguments = (ins Arrow_AnyArrayType:$arr);
     let results = (outs AnyMemRef: $res);
+}
+
+def Arrow_CastMemrefToArrayOp : Arrow_Op<"memref_to_array_cast", [NoSideEffect]> {
+    let summary = [{
+        cast array to memref
+    }];
+    let arguments = (ins AnyMemRef:$mem);
+    let results = (outs Arrow_AnyArrayType: $res);
 }
 
 def Arrow_ConstArrayOp : Arrow_Op<"const_array", [NoSideEffect]> {
@@ -227,7 +237,7 @@ def Arrow_GetColumnOp : Arrow_Op<"get_column", [NoSideEffect]> {
     let summary = [{
         return column by index from table 
     }];
-    let arguments = (ins I64Attr: $idx);
+    let arguments = (ins StrAttr: $name);
     let results = (outs Arrow_AnyColumnType: $res);
 }
 
@@ -235,7 +245,7 @@ def Arrow_GetArrayOp : Arrow_Op<"get_array", [NoSideEffect]> {
     let summary = [{
         returns array from table
     }];
-    let arguments = (ins I64Attr: $col, I64Attr: $idx);
+    let arguments = (ins StrAttr: $col, I64Attr: $idx);
     let results = (outs Arrow_AnyArrayType: $res);
 }
 
@@ -262,4 +272,22 @@ def Arrow_CreateEmptyColumnOp : Arrow_Op<"create_empty_column", [NoSideEffect]> 
     let arguments = (outs);
     let results = (outs Arrow_AnyColumnType: $res);
 }
+
+def Arrow_ReturnColumnOp : Arrow_Op<"return_column", []> {
+    let summary = [{
+        return resulting column
+    }];
+    let arguments = (ins Arrow_AnyColumnType: $col, StrAttr: $name);
+    let results = (outs);
+}
+
+def Arrow_ReturnArrayOp : Arrow_Op<"return_array", []> {
+    let summary = [{
+        return resulting array
+    }];
+    let arguments = (ins Arrow_AnyArrayOrMemref: $arr, StrAttr: $col, I64Attr: $idx);
+    let results = (outs);
+}
+
+
 #endif // TABLEGEN_ARROW_OPS
