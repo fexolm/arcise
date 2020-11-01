@@ -64,8 +64,8 @@ struct BinaryOpLowering : public mlir::ConversionPattern {
     if (rhs.getType().isa<ArrayType>()) {
       auto unwrapRhs = rewriter.create<UnwrapArrayOp>(loc, nullBitmapType,
                                                       dataBufferType, rhs);
-      auto rhsBuffer = unwrapLhs.data_buffer();
-      auto rhsBitmap = unwrapLhs.null_bitmap();
+      auto rhsBuffer = unwrapRhs.data_buffer();
+      auto rhsBitmap = unwrapRhs.null_bitmap();
       resultBitmap = insertAllocAndDealloc(nullBitmapType, loc, rewriter);
 
       mlir::buildAffineLoopNest(

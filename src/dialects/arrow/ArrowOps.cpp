@@ -1,6 +1,7 @@
 #include "dialects/arrow/ArrowOps.h"
 #include "dialects/arrow/ArrowDialect.h"
 #include "dialects/arrow/ArrowTypes.h"
+#include "dialects/arrow/transforms/SimplifyRedundantWrapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/StandardTypes.h"
@@ -70,4 +71,16 @@ mlir::LogicalResult verifyParamTypesAreSame(mlir::Operation *op) {
 
 #define GET_OP_CLASSES
 #include "dialects/arrow/tablegen/ArrowOps.cpp.inc"
+
+void UnwrapArrayOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SimplifyRedundantWrapping<UnwrapArrayOp, MakeArrayOp>>(
+      context);
+}
+
+void UnwrapColumnOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SimplifyRedundantWrapping<UnwrapColumnOp, MakeColumnOp>>(
+      context);
+}
 } // namespace arcise::dialects::arrow

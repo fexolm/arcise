@@ -1,4 +1,3 @@
-#pragma once
 #include "dialects/arrow/ArrowDialect.h"
 #include "dialects/arrow/ArrowOps.h"
 #include "dialects/arrow/ArrowTypes.h"

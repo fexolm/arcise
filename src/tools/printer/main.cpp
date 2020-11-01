@@ -39,9 +39,11 @@ int main(int argc, char **argv) {
 
   pm.addPass(AD::createSplitColumnarOpsPass());
   pm.addPass(AD::createLowerToAffinePass());
+  pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(mlir::createCSEPass());
 
-  //   pm.addPass(mlir::createLoopFusionPass());
-  //   pm.addPass(mlir::createMemRefDataFlowOptPass());
+  pm.addPass(mlir::createLoopFusionPass(0, 0, true));
+  pm.addPass(mlir::createMemRefDataFlowOptPass());
 
   //   pm.addPass(mlir::createCSEPass());
   //   pm.addPass(mlir::createCanonicalizerPass());

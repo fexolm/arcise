@@ -224,6 +224,7 @@ def Arrow_UnwrapArrayOp : Arrow_Op<"unwrap_array", [NoSideEffect]> {
     let arguments = (ins Arrow_AnyArrayType: $arr);
     let results = (outs AnyMemRef: $null_bitmap,
                         AnyMemRef: $data_buffer);
+    let hasCanonicalizer = 1;
 }
 
 def Arrow_UnwrapColumnOp : Arrow_Op<"unwrap_column", [NoSideEffect]> {
@@ -232,6 +233,7 @@ def Arrow_UnwrapColumnOp : Arrow_Op<"unwrap_column", [NoSideEffect]> {
     }];
     let arguments = (ins Arrow_AnyColumnType: $col);
     let results = (outs Variadic<Arrow_AnyArrayType>: $res);
+    let hasCanonicalizer = 1;
 }
 
 def Arrow_MakeArrayOp : Arrow_Op<"make_array", [NoSideEffect]> {
