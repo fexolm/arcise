@@ -1,37 +1,34 @@
 #include "dialects/arrow/ArrowDialect.h"
 #include "dialects/arrow/ArrowOps.h"
 #include "dialects/arrow/ArrowTypes.h"
-#include <mlir/IR/DialectImplementation.h>
+#include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/StandardTypes.h"
 
-namespace arcise::dialects::arrow {
-void ArrowDialect::initialize() {
+void arcise::dialects::arrow::ArrowDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
 #include "dialects/arrow/tablegen/ArrowOps.cpp.inc"
 #undef GET_OP_LIST
+
       >();
-  addTypes<ArrayType, ColumnType, TableType>();
+  addTypes<ArrayType, RecordBatchType>();
 }
 
+namespace arcise::dialects::arrow {
 mlir::Type ArrowDialect::parseType(mlir::DialectAsmParser &parser) const {}
+
 void ArrowDialect::printType(mlir::Type type,
                              mlir::DialectAsmPrinter &printer) const {
   if (type.isa<ArrayType>()) {
     auto arrayType = type.cast<ArrayType>();
     printer.getStream() << "array<";
     printer.printType(arrayType.getElementType());
-    printer.getStream() << ", length=" << arrayType.getLength();
     printer.getStream() << ">";
   }
 
-  if (type.isa<ColumnType>()) {
-    auto columnType = type.cast<ColumnType>();
-    printer.getStream() << "column";
-  }
-
-  if (type.isa<TableType>()) {
-    auto columnType = type.cast<TableType>();
-    printer.getStream() << "table";
+  if (type.isa<RecordBatchType>()) {
+    printer.getStream() << "record_batch";
   }
 }
 } // namespace arcise::dialects::arrow

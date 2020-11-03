@@ -15,7 +15,6 @@
 #include "dialects/arrow/ArrowTypes.h"
 
 int main(int argc, char **argv) {
-  mlir::registerAllDialects();
   mlir::registerAllPasses();
   // TODO: Register arrow passes here.
 

@@ -5,7 +5,8 @@ add_mlir_dialect_library(ArrowDialect
     ArrowDialect.cpp
     ArrowTypes.cpp
     passes/LowerToAffinePass.cpp
-    passes/SplitColumnarOpsPass.cpp
+    passes/MoveAllocationsOnTopPass.cpp
+    transforms/SimplifyArrayMaterialization.cpp
     ADDITIONAL_HEADER_DIRS
         ${PROJECT_SOURCE_DIR}/src/dialects/arrow
 

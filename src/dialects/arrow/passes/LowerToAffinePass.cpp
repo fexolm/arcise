@@ -9,20 +9,19 @@
 
 namespace arcise::dialects::arrow {
 
-static mlir::Value insertAllocAndDealloc(mlir::MemRefType type,
+static mlir::Value insertAllocAndDealloc(mlir::PatternRewriter &rewriter,
                                          mlir::Location loc,
-                                         mlir::PatternRewriter &rewriter) {
-  auto alloc = rewriter.create<mlir::AllocOp>(loc, type);
+                                         mlir::MemRefType type,
+                                         mlir::Value size) {
+  auto alloc = rewriter.create<mlir::AllocOp>(loc, type, size);
 
   auto *parentBlock = alloc.getOperation()->getBlock();
-  alloc.getOperation()->moveBefore(&parentBlock->front());
-
   auto dealloc = rewriter.create<mlir::DeallocOp>(loc, alloc);
   dealloc.getOperation()->moveBefore(&parentBlock->back());
   return alloc;
 }
 
-template <typename BinaryOp, typename LoweredBinaryOpBuilder, bool IsConst>
+template <typename BinaryOp, typename LoweredBinaryOpBuilder>
 struct BinaryOpLowering : public mlir::ConversionPattern {
   BinaryOpLowering(mlir::MLIRContext *ctx)
       : ConversionPattern(BinaryOp::getOperationName(), 1, ctx) {}
@@ -35,41 +34,40 @@ struct BinaryOpLowering : public mlir::ConversionPattern {
     auto arrayType = (*op->operand_type_begin()).cast<ArrayType>();
     auto resultType = (*op->result_type_begin()).cast<ArrayType>();
 
-    mlir::SmallVector<int64_t, 1> lbs(1, 0);
-    mlir::SmallVector<int64_t, 1> ubs(1, arrayType.getLength());
-    mlir::SmallVector<int64_t, 1> steps(1, 1);
+    mlir::Value zeroConstant =
+        rewriter.create<mlir::ConstantOp>(loc, rewriter.getIndexAttr(0));
 
     typename BinaryOp::Adaptor binaryAdaptor(operands);
     mlir::Value lhs = binaryAdaptor.lhs();
     mlir::Value rhs = binaryAdaptor.rhs();
 
-    auto nullBitmapType =
-        mlir::MemRefType::get(arrayType.getLength(), rewriter.getI1Type());
+    mlir::Value arrayLength =
+        rewriter.create<GetLengthOp>(loc, rewriter.getIndexType(), lhs);
 
-    auto dataBufferType = mlir::MemRefType::get(arrayType.getLength(),
-                                                arrayType.getElementType());
+    auto nullBitmapType = mlir::MemRefType::get(-1, rewriter.getI1Type());
+    auto dataBufferType = mlir::MemRefType::get(-1, arrayType.getElementType());
+    auto resultBufferType =
+        mlir::MemRefType::get(-1, resultType.getElementType());
 
-    auto resultBufferType = mlir::MemRefType::get(resultType.getLength(),
-                                                  resultType.getElementType());
-
-    auto unwrapLhs = rewriter.create<UnwrapArrayOp>(loc, nullBitmapType,
-                                                    dataBufferType, lhs);
-
-    auto lhsBuffer = unwrapLhs.data_buffer();
-    auto lhsBitmap = unwrapLhs.null_bitmap();
+    auto lhsBuffer = rewriter.create<GetDataBufferOp>(loc, dataBufferType, lhs);
+    auto lhsBitmap = rewriter.create<GetNullBitmapOp>(loc, nullBitmapType, lhs);
 
     mlir::Value resultBuffer =
-        insertAllocAndDealloc(resultBufferType, loc, rewriter);
+        insertAllocAndDealloc(rewriter, loc, resultBufferType, arrayLength);
+
     mlir::Value resultBitmap;
     if (rhs.getType().isa<ArrayType>()) {
-      auto unwrapRhs = rewriter.create<UnwrapArrayOp>(loc, nullBitmapType,
-                                                      dataBufferType, rhs);
-      auto rhsBuffer = unwrapRhs.data_buffer();
-      auto rhsBitmap = unwrapRhs.null_bitmap();
-      resultBitmap = insertAllocAndDealloc(nullBitmapType, loc, rewriter);
+      auto rhsBuffer =
+          rewriter.create<GetDataBufferOp>(loc, dataBufferType, rhs);
+      auto rhsBitmap =
+          rewriter.create<GetNullBitmapOp>(loc, nullBitmapType, rhs);
+
+      // we don't need to allocate bitmap buffer if second operand is constant
+      resultBitmap =
+          insertAllocAndDealloc(rewriter, loc, nullBitmapType, arrayLength);
 
       mlir::buildAffineLoopNest(
-          rewriter, loc, lbs, ubs, steps,
+          rewriter, loc, zeroConstant, arrayLength, 1,
           [&](mlir::OpBuilder &builder, mlir::Location loc,
               mlir::ValueRange ivs) {
             auto loadedLhsBuffer =
@@ -96,7 +94,7 @@ struct BinaryOpLowering : public mlir::ConversionPattern {
           });
     } else {
       mlir::buildAffineLoopNest(
-          rewriter, loc, lbs, ubs, steps,
+          rewriter, loc, zeroConstant, arrayLength, 1,
           [&](mlir::OpBuilder &builder, mlir::Location loc,
               mlir::ValueRange ivs) {
             auto loadedLhsBuffer =
@@ -150,87 +148,46 @@ struct ComparisonOpBuilder {
   }
 };
 
-using ArrowEqOpLowering = BinaryOpLowering<
-    EqOp,
-    ComparisonOpBuilder<mlir::CmpIPredicate::eq, mlir::CmpFPredicate::OEQ>,
-    false>;
-using ArrowNeqOpLowering = BinaryOpLowering<
-    NeqOp,
-    ComparisonOpBuilder<mlir::CmpIPredicate::ne, mlir::CmpFPredicate::ONE>,
-    false>;
-using ArrowGeOpLowering = BinaryOpLowering<
-    GeOp,
-    ComparisonOpBuilder<mlir::CmpIPredicate::sge, mlir::CmpFPredicate::OGE>,
-    false>;
-using ArrowLeOpLowering = BinaryOpLowering<
-    LeOp,
-    ComparisonOpBuilder<mlir::CmpIPredicate::sle, mlir::CmpFPredicate::OLE>,
-    false>;
-using ArrowGtOpLowering = BinaryOpLowering<
-    GtOp,
-    ComparisonOpBuilder<mlir::CmpIPredicate::sgt, mlir::CmpFPredicate::OGT>,
-    false>;
-using ArrowLtOpLowering = BinaryOpLowering<
-    LtOp,
-    ComparisonOpBuilder<mlir::CmpIPredicate::slt, mlir::CmpFPredicate::OLT>,
-    false>;
-using ArrowConstEqOpLowering = BinaryOpLowering<
-    ConstEqOp,
-    ComparisonOpBuilder<mlir::CmpIPredicate::eq, mlir::CmpFPredicate::OEQ>,
-    true>;
-using ArrowConstNeqOpLowering = BinaryOpLowering<
-    ConstNeqOp,
-    ComparisonOpBuilder<mlir::CmpIPredicate::ne, mlir::CmpFPredicate::ONE>,
-    true>;
-using ArrowConstGeOpLowering = BinaryOpLowering<
-    ConstGeOp,
-    ComparisonOpBuilder<mlir::CmpIPredicate::sge, mlir::CmpFPredicate::OGE>,
-    true>;
-using ArrowConstLeOpLowering = BinaryOpLowering<
-    ConstLeOp,
-    ComparisonOpBuilder<mlir::CmpIPredicate::sle, mlir::CmpFPredicate::OLE>,
-    true>;
-using ArrowConstGtOpLowering = BinaryOpLowering<
-    ConstGtOp,
-    ComparisonOpBuilder<mlir::CmpIPredicate::sgt, mlir::CmpFPredicate::OGT>,
-    true>;
-using ArrowConstLtOpLowering = BinaryOpLowering<
-    ConstLtOp,
-    ComparisonOpBuilder<mlir::CmpIPredicate::slt, mlir::CmpFPredicate::OLT>,
-    true>;
+using ArrowEqOpLowering =
+    BinaryOpLowering<EqOp, ComparisonOpBuilder<mlir::CmpIPredicate::eq,
+                                               mlir::CmpFPredicate::OEQ>>;
+using ArrowNeqOpLowering =
+    BinaryOpLowering<NeqOp, ComparisonOpBuilder<mlir::CmpIPredicate::ne,
+                                                mlir::CmpFPredicate::ONE>>;
+using ArrowGeOpLowering =
+    BinaryOpLowering<GeOp, ComparisonOpBuilder<mlir::CmpIPredicate::sge,
+                                               mlir::CmpFPredicate::OGE>>;
+using ArrowLeOpLowering =
+    BinaryOpLowering<LeOp, ComparisonOpBuilder<mlir::CmpIPredicate::sle,
+                                               mlir::CmpFPredicate::OLE>>;
+using ArrowGtOpLowering =
+    BinaryOpLowering<GtOp, ComparisonOpBuilder<mlir::CmpIPredicate::sgt,
+                                               mlir::CmpFPredicate::OGT>>;
+using ArrowLtOpLowering =
+    BinaryOpLowering<LtOp, ComparisonOpBuilder<mlir::CmpIPredicate::slt,
+                                               mlir::CmpFPredicate::OLT>>;
+
 using ArrowSumOpLowering =
-    BinaryOpLowering<SumOp, ArithmeticOpBuilder<mlir::AddIOp, mlir::AddFOp>,
-                     false>;
+    BinaryOpLowering<SumOp, ArithmeticOpBuilder<mlir::AddIOp, mlir::AddFOp>>;
 using ArrowMulOpLowering =
-    BinaryOpLowering<MulOp, ArithmeticOpBuilder<mlir::MulIOp, mlir::MulFOp>,
-                     false>;
-using ArrowDivOpLowering = BinaryOpLowering<
-    DivOp, ArithmeticOpBuilder<mlir::SignedDivIOp, mlir::DivFOp>, false>;
+    BinaryOpLowering<MulOp, ArithmeticOpBuilder<mlir::MulIOp, mlir::MulFOp>>;
+using ArrowDivOpLowering =
+    BinaryOpLowering<DivOp,
+                     ArithmeticOpBuilder<mlir::SignedDivIOp, mlir::DivFOp>>;
 using ArrowSubOpLowering =
-    BinaryOpLowering<SubOp, ArithmeticOpBuilder<mlir::SubIOp, mlir::SubFOp>,
-                     false>;
-using ArrowConstSumOpLowering =
-    BinaryOpLowering<ConstSumOp,
-                     ArithmeticOpBuilder<mlir::AddIOp, mlir::AddFOp>, true>;
-using ArrowConstMulOpLowering =
-    BinaryOpLowering<ConstMulOp,
-                     ArithmeticOpBuilder<mlir::MulIOp, mlir::MulFOp>, true>;
-using ArrowConstDivOpLowering = BinaryOpLowering<
-    ConstDivOp, ArithmeticOpBuilder<mlir::SignedDivIOp, mlir::DivFOp>, true>;
-using ArrowConstSubOpLowering =
-    BinaryOpLowering<ConstSubOp,
-                     ArithmeticOpBuilder<mlir::SubIOp, mlir::SubFOp>, true>;
-using ArrowAndOpLowering =
-    BinaryOpLowering<AndOp, ExactOpBuilder<mlir::AndOp>, false>;
-using ArrowOrOpLowering =
-    BinaryOpLowering<OrOp, ExactOpBuilder<mlir::OrOp>, false>;
+    BinaryOpLowering<SubOp, ArithmeticOpBuilder<mlir::SubIOp, mlir::SubFOp>>;
+
+using ArrowAndOpLowering = BinaryOpLowering<AndOp, ExactOpBuilder<mlir::AndOp>>;
+using ArrowOrOpLowering = BinaryOpLowering<OrOp, ExactOpBuilder<mlir::OrOp>>;
 
 struct ArrowToAffineLoweringPass
-    : public PassWrapper<ArrowToAffineLoweringPass, FunctionPass> {
+    : public mlir::PassWrapper<ArrowToAffineLoweringPass, mlir::FunctionPass> {
+
   void getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<mlir::AffineDialect, mlir::StandardOpsDialect>();
   }
-  void runOnFunction() final {
+
+  void runOnFunction() override {
     auto function = getFunction();
 
     mlir::ConversionTarget target(getContext());
@@ -240,39 +197,35 @@ struct ArrowToAffineLoweringPass
     target.addIllegalDialect<ArrowDialect>();
     // target.addLegalOp<FilterOp>();
     target.addLegalOp<GetColumnOp>();
-    target.addLegalOp<UnwrapArrayOp>();
-    target.addLegalOp<UnwrapColumnOp>();
     target.addLegalOp<MakeArrayOp>();
-    target.addLegalOp<MakeColumnOp>();
-    target.addLegalOp<MakeTableOp>();
+    target.addLegalOp<GetDataBufferOp>();
+    target.addLegalOp<GetNullBitmapOp>();
+    target.addLegalOp<GetLengthOp>();
+    target.addLegalOp<GetRowsCountOp>();
+    target.addLegalOp<MakeRecordBatchOp>();
 
     mlir::OwningRewritePatternList patterns;
-    patterns.insert<
-        ArrowEqOpLowering, ArrowNeqOpLowering, ArrowGeOpLowering,
-        ArrowLeOpLowering, ArrowGtOpLowering, ArrowLtOpLowering,
-        ArrowConstEqOpLowering, ArrowConstNeqOpLowering, ArrowConstGeOpLowering,
-        ArrowConstLeOpLowering, ArrowConstGtOpLowering, ArrowConstLtOpLowering,
-        ArrowSumOpLowering, ArrowMulOpLowering, ArrowDivOpLowering,
-        ArrowSubOpLowering, ArrowConstSumOpLowering, ArrowConstMulOpLowering,
-        ArrowConstDivOpLowering, ArrowConstSubOpLowering, ArrowAndOpLowering,
-        ArrowOrOpLowering>(&getContext());
+    patterns.insert<ArrowEqOpLowering, ArrowNeqOpLowering, ArrowGeOpLowering,
+                    ArrowLeOpLowering, ArrowGtOpLowering, ArrowLtOpLowering,
+                    ArrowSumOpLowering, ArrowMulOpLowering, ArrowDivOpLowering,
+                    ArrowSubOpLowering, ArrowAndOpLowering, ArrowOrOpLowering>(
+        &getContext());
 
     // With the target and rewrite patterns defined, we can now attempt the
     // conversion. The conversion will signal failure if any of our `illegal`
     // operations were not converted successfully.
-    if (failed(applyPartialConversion(getFunction(), target, patterns)))
+    if (failed(
+            applyPartialConversion(getFunction(), target, std::move(patterns))))
       signalPassFailure();
 
     std::vector<mlir::Value> resultArrays;
 
     function.walk([&](mlir::Operation *op) {
       if (auto returnOp = mlir::dyn_cast<mlir::ReturnOp>(op)) {
-        mlir::Value tableResult = returnOp.getOperand(0);
-        for (auto col : tableResult.getDefiningOp()->getOperands()) {
-          for (auto arr : col.getDefiningOp()->getOperands()) {
-            for (auto memref : arr.getDefiningOp()->getOperands()) {
-              resultArrays.push_back(memref);
-            }
+        mlir::Value recordBatchResult = returnOp.getOperand(0);
+        for (auto arr : recordBatchResult.getDefiningOp()->getOperands()) {
+          for (auto memref : arr.getDefiningOp()->getOperands()) {
+            resultArrays.push_back(memref);
           }
         }
       }
@@ -293,8 +246,8 @@ struct ArrowToAffineLoweringPass
       op->erase();
     }
   }
-};
-std::unique_ptr<Pass> createLowerToAffinePass() {
+}; // namespace arcise::dialects::arrow
+std::unique_ptr<mlir::Pass> createLowerToAffinePass() {
   return std::make_unique<ArrowToAffineLoweringPass>();
 }
 } // namespace arcise::dialects::arrow

@@ -2,9 +2,9 @@ FROM debian:sid-20200803-slim as arcise-env
 
 RUN apt-get update
 RUN apt-get install -y build-essential unzip wget tar cmake ninja-build gdb git python3
-RUN wget https://github.com/llvm/llvm-project/archive/8427885e27813c457dccb011f65e8ded74444e31.zip
-RUN unzip 8427885e27813c457dccb011f65e8ded74444e31.zip
-RUN mv llvm-project-8427885e27813c457dccb011f65e8ded74444e31 llvm-project
+RUN wget https://github.com/llvm/llvm-project/archive/1267bb2e416e42f9c3bbfa7b6cbf4975fa7aa546.zip
+RUN unzip 1267bb2e416e42f9c3bbfa7b6cbf4975fa7aa546.zip
+RUN mv llvm-project-1267bb2e416e42f9c3bbfa7b6cbf4975fa7aa546 llvm-project
 RUN mkdir llvm-project/build
 
 WORKDIR llvm-project/build
@@ -20,6 +20,7 @@ RUN cmake --build . --target install -j 2
 
 # installing some development tools here in order to avoid rebuilding dependencies after
 # after each tool would be added
+RUN apt-get update
 RUN apt-get install -y --no-install-recommends clang-format
 
 WORKDIR /

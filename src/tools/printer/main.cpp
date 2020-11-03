@@ -5,6 +5,7 @@
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "dialects/arrow/ArrowDialect.h"
@@ -20,7 +21,6 @@ int main(int argc, char **argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "arcise\n");
 
   namespace AD = arcise::dialects::arrow;
-  mlir::registerAllDialects();
   mlir::registerAllPasses();
 
   mlir::DialectRegistry registry;
@@ -34,21 +34,13 @@ int main(int argc, char **argv) {
   registry.loadAll(&ctx);
 
   mlir::PassManager pm(&ctx, true);
-  pm.addPass(mlir::createCSEPass());
   pm.addPass(mlir::createCanonicalizerPass());
-
-  pm.addPass(AD::createSplitColumnarOpsPass());
+  pm.addPass(mlir::createCSEPass());
   pm.addPass(AD::createLowerToAffinePass());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
-
-  pm.addPass(mlir::createLoopFusionPass(0, 0, true));
+  pm.addPass(AD::createMoveAllocationsOnTopPass());
   pm.addPass(mlir::createMemRefDataFlowOptPass());
-
-  //   pm.addPass(mlir::createCSEPass());
-  //   pm.addPass(mlir::createCanonicalizerPass());
-
-  //   pm.addPass(mlir::createSuperVectorizePass(256));
 
   mlir::OpBuilder builder(&ctx);
 
@@ -56,30 +48,15 @@ int main(int argc, char **argv) {
 
   mlir::ModuleOp module = mlir::ModuleOp::create(loc);
 
-  std::vector<size_t> sizes = {123412, 12342, 43223};
+  mlir::Type I1Array = builder.getType<AD::ArrayType>(builder.getI1Type());
+  mlir::Type I64Array = builder.getType<AD::ArrayType>(builder.getI64Type());
 
-  std::vector<mlir::Type> resArrays;
-  std::vector<mlir::Type> colArrays;
+  auto inputType = AD::RecordBatchType::get(&ctx, {"a", "b", "c"},
+                                            {I64Array, I64Array, I64Array});
 
-  for (auto size : sizes) {
-    resArrays.push_back(
-        builder.getType<AD::ArrayType>(builder.getI1Type(), size));
-    colArrays.push_back(
-        builder.getType<AD::ArrayType>(builder.getI64Type(), size));
-  }
+  auto outputType = AD::RecordBatchType::get(&ctx, {"res"}, {I1Array});
 
-  mlir::Type resType =
-      builder.getType<AD::ColumnType>(builder.getI1Type(), resArrays);
-
-  mlir::Type columnsType =
-      builder.getType<AD::ColumnType>(builder.getI64Type(), colArrays);
-
-  auto tableInType = AD::TableType::get(
-      &ctx, {"a", "b", "c"}, {columnsType, columnsType, columnsType});
-
-  auto tableOutType = AD::TableType::get(&ctx, {"res"}, {resType});
-
-  auto func = builder.getFunctionType({tableInType}, {tableOutType});
+  auto func = builder.getFunctionType({inputType}, {outputType});
 
   auto funcOp = builder.create<mlir::FuncOp>(loc, "f", func);
 
@@ -87,27 +64,27 @@ int main(int argc, char **argv) {
 
   builder.setInsertionPointToStart(block);
 
-  auto tableIn = funcOp.getArgument(0);
+  auto input = funcOp.getArgument(0);
 
-  auto c1 = builder.create<AD::GetColumnOp>(loc, columnsType, tableIn, "a");
+  auto c1 = builder.create<AD::GetColumnOp>(loc, I64Array, input, "a");
 
-  auto c2 = builder.create<AD::GetColumnOp>(loc, columnsType, tableIn, "b");
+  auto c2 = builder.create<AD::GetColumnOp>(loc, I64Array, input, "b");
 
-  auto c3 = builder.create<AD::GetColumnOp>(loc, columnsType, tableIn, "c");
+  auto c3 = builder.create<AD::GetColumnOp>(loc, I64Array, input, "c");
 
-  mlir::Value res = builder.create<AD::SumOp>(loc, columnsType, c1, c2);
+  mlir::Value res = builder.create<AD::SumOp>(loc, I64Array, c1, c2);
 
-  res = builder.create<AD::ConstMulOp>(
-      loc, columnsType, res,
+  res = builder.create<AD::MulOp>(loc, I64Array, res, c3);
+
+  res = builder.create<AD::GeOp>(
+      loc, I1Array, res,
       builder.create<mlir::ConstantOp>(loc, builder.getI64Type(),
                                        builder.getI64IntegerAttr(5)));
 
-  res = builder.create<AD::GeOp>(loc, resType, c3, res);
+  mlir::Value output =
+      builder.create<AD::MakeRecordBatchOp>(loc, outputType, res);
 
-  mlir::Value tableRes =
-      builder.create<AD::MakeTableOp>(loc, tableOutType, res);
-
-  builder.create<mlir::ReturnOp>(loc, tableRes);
+  builder.create<mlir::ReturnOp>(loc, output);
 
   module.push_back(funcOp);
 
