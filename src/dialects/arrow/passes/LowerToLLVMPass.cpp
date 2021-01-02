@@ -86,7 +86,6 @@ public:
                           std::find(rbType.getColumnNames().begin(),
                                     rbType.getColumnNames().end(), columnName));
 
-    auto arrayType = rbType.getColumnType(columnName.str());
     auto resultType = typeConverter->convertType(op.res().getType())
                           .cast<mlir::LLVM::LLVMType>();
 
@@ -182,17 +181,27 @@ public:
   mlir::LogicalResult
   matchAndRewrite(MakeArrayOp op, mlir::ArrayRef<mlir::Value> operands,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    // auto nullBitmap = op.null_bitmap();
-    // auto dataBuf = op.data_buffer();
+    auto nullBitmap = op.null_bitmap();
+    auto dataBuf = op.data_buffer();
 
-    // auto len = rewriter.create<mlir::DimOp>(op.getLoc(), dataBuf, 0);
+    auto len = rewriter.create<mlir::DimOp>(op.getLoc(), dataBuf, 0);
 
     auto llvmArrayType = typeConverter->convertType(op.res().getType());
 
     auto i64Type = typeConverter->convertType(rewriter.getI64Type())
                        .cast<mlir::LLVM::LLVMType>();
 
-    auto res = rewriter.create<mlir::LLVM::UndefOp>(op.getLoc(), llvmArrayType);
+    mlir::Value res =
+        rewriter.create<mlir::LLVM::UndefOp>(op.getLoc(), llvmArrayType);
+    res = rewriter.create<mlir::LLVM::InsertValueOp>(
+        op.getLoc(), rewriter.getRemappedValue(res),
+        rewriter.getRemappedValue(dataBuf), rewriter.getIndexArrayAttr(0));
+    res = rewriter.create<mlir::LLVM::InsertValueOp>(
+        op.getLoc(), rewriter.getRemappedValue(res),
+        rewriter.getRemappedValue(nullBitmap), rewriter.getIndexArrayAttr(1));
+    res = rewriter.create<mlir::LLVM::InsertValueOp>(
+        op.getLoc(), rewriter.getRemappedValue(res),
+        rewriter.getRemappedValue(len), rewriter.getIndexArrayAttr(2));
 
     rewriter.replaceOp(op, {res});
 
@@ -211,7 +220,19 @@ public:
 
     auto llvmRBType = typeConverter->convertType(op.res().getType());
 
-    auto res = rewriter.create<mlir::LLVM::UndefOp>(op.getLoc(), llvmRBType);
+    mlir::Value res =
+        rewriter.create<mlir::LLVM::UndefOp>(op.getLoc(), llvmRBType);
+
+    res = rewriter.create<mlir::LLVM::InsertValueOp>(
+        op.getLoc(), rewriter.getRemappedValue(res),
+        rewriter.getRemappedValue(op.length()), rewriter.getIndexArrayAttr(0));
+
+    for (int i = 0; i < op.columns().size(); i++) {
+      res = rewriter.create<mlir::LLVM::InsertValueOp>(
+          op.getLoc(), res,
+          rewriter.getRemappedValue(op.columns()[i]),
+          rewriter.getIndexArrayAttr(1 + i));
+    }
 
     rewriter.replaceOp(op, {res});
 

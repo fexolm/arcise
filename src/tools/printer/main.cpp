@@ -43,9 +43,10 @@ int dumpLLVMIR(mlir::ModuleOp module) {
   mlir::ExecutionEngine::setupTargetTriple(llvmModule.get());
 
   /// Optionally run an optimization pipeline over the llvm module.
-  auto optPipeline = mlir::makeOptimizingTransformer(
-      /*optLevel=*/ 0 , /*sizeLevel=*/0,
-      /*targetMachine=*/nullptr);
+  auto optPipeline = mlir::makeOptimizingTransformer(3, 0, nullptr);
+
+  auto maybeEngine = mlir::ExecutionEngine::create(module, optPipeline);
+
   if (auto err = optPipeline(llvmModule.get())) {
     llvm::errs() << "Failed to optimize LLVM IR " << err << "\n";
     return -1;
@@ -81,6 +82,7 @@ int main(int argc, char **argv) {
   pm.addPass(mlir::createCSEPass());
   pm.addPass(AD::createMoveAllocationsOnTopPass());
   pm.addPass(mlir::createMemRefDataFlowOptPass());
+  pm.addPass(mlir::createSuperVectorizePass());
   pm.addPass(AD::createLowerToLLVMPass());
 
   mlir::OpBuilder builder(&ctx);
@@ -122,8 +124,9 @@ int main(int argc, char **argv) {
       builder.create<mlir::ConstantOp>(loc, builder.getI64Type(),
                                        builder.getI64IntegerAttr(5)));
 
-  mlir::Value output =
-      builder.create<AD::MakeRecordBatchOp>(loc, outputType, res);
+  mlir::Value output = builder.create<AD::MakeRecordBatchOp>(
+      loc, outputType,
+      builder.create<AD::GetLengthOp>(loc, builder.getIndexType(), res), res);
 
   builder.create<mlir::ReturnOp>(loc, output);
 

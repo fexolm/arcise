@@ -167,7 +167,7 @@ def Arrow_MakeRecordBatchOp : Arrow_Op<"make_recordbatch", [NoSideEffect]> {
     let summary = [{
         make recordbatch from arrays
     }];
-    let arguments = (ins Variadic<Arrow_AnyArrayType>: $columns);
+    let arguments = (ins Index: $length, Variadic<Arrow_AnyArrayType>: $columns);
     let results = (outs Arrow_RecordBatchType: $res);
 }
 
