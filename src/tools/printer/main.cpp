@@ -14,6 +14,47 @@
 #include "dialects/arrow/passes/Passes.h"
 #include <iostream>
 
+#include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include "mlir/Target/LLVMIR.h"
+
+#include "mlir/ExecutionEngine/ExecutionEngine.h"
+#include "mlir/ExecutionEngine/OptUtils.h"
+
+int dumpLLVMIR(mlir::ModuleOp module) {
+  // Convert the module to LLVM IR in a new LLVM IR context.
+  llvm::LLVMContext llvmContext;
+  auto llvmModule = mlir::translateModuleToLLVMIR(module, llvmContext);
+  if (!llvmModule) {
+    llvm::errs() << "Failed to emit LLVM IR\n";
+    return -1;
+  }
+
+  // Initialize LLVM targets.
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  mlir::ExecutionEngine::setupTargetTriple(llvmModule.get());
+
+  /// Optionally run an optimization pipeline over the llvm module.
+  auto optPipeline = mlir::makeOptimizingTransformer(3, 0, nullptr);
+
+  auto maybeEngine = mlir::ExecutionEngine::create(module, optPipeline);
+
+  if (auto err = optPipeline(llvmModule.get())) {
+    llvm::errs() << "Failed to optimize LLVM IR " << err << "\n";
+    return -1;
+  }
+  llvm::errs() << *llvmModule << "\n";
+  return 0;
+}
+
 int main(int argc, char **argv) {
 
   mlir::registerMLIRContextCLOptions();
@@ -24,8 +65,8 @@ int main(int argc, char **argv) {
   mlir::registerAllPasses();
 
   mlir::DialectRegistry registry;
+  mlir::registerAllDialects(registry);
   registry.insert<AD::ArrowDialect>();
-  registry.insert<mlir::StandardOpsDialect>();
 
   mlir::MLIRContext ctx;
 
@@ -41,6 +82,8 @@ int main(int argc, char **argv) {
   pm.addPass(mlir::createCSEPass());
   pm.addPass(AD::createMoveAllocationsOnTopPass());
   pm.addPass(mlir::createMemRefDataFlowOptPass());
+  pm.addPass(mlir::createSuperVectorizePass());
+  pm.addPass(AD::createLowerToLLVMPass());
 
   mlir::OpBuilder builder(&ctx);
 
@@ -81,8 +124,9 @@ int main(int argc, char **argv) {
       builder.create<mlir::ConstantOp>(loc, builder.getI64Type(),
                                        builder.getI64IntegerAttr(5)));
 
-  mlir::Value output =
-      builder.create<AD::MakeRecordBatchOp>(loc, outputType, res);
+  mlir::Value output = builder.create<AD::MakeRecordBatchOp>(
+      loc, outputType,
+      builder.create<AD::GetLengthOp>(loc, builder.getIndexType(), res), res);
 
   builder.create<mlir::ReturnOp>(loc, output);
 
@@ -93,5 +137,6 @@ int main(int argc, char **argv) {
   if (mlir::failed(pm.run(module)))
     std::cerr << "FAIL" << std::endl;
 
+  dumpLLVMIR(module);
   return 0;
 }
