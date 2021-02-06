@@ -45,7 +45,8 @@ int dumpLLVMIR(mlir::ModuleOp module) {
   /// Optionally run an optimization pipeline over the llvm module.
   auto optPipeline = mlir::makeOptimizingTransformer(3, 0, nullptr);
 
-  auto maybeEngine = mlir::ExecutionEngine::create(module, optPipeline);
+  // TODO
+  // auto maybeEngine = mlir::ExecutionEngine::create(module, optPipeline);
 
   if (auto err = optPipeline(llvmModule.get())) {
     llvm::errs() << "Failed to optimize LLVM IR " << err << "\n";
