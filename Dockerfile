@@ -30,7 +30,8 @@ WORKDIR /arrow/cpp/build
 RUN cmake -DCMAKE_BUILD_TYPE=Debug ..
 RUN cmake --build . --target install -j 4
 
-WORKDIR /
+RUN apt-get update && apt-get install -y neovim ccls fzf ripgrep nodejs npm tmux
+
 RUN useradd -ms /bin/bash docker
-
-
+USER docker
+CMD /bin/bash
