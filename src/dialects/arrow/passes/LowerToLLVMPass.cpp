@@ -188,9 +188,6 @@ public:
 
     auto llvmArrayType = typeConverter->convertType(op.res().getType());
 
-    auto i64Type = typeConverter->convertType(rewriter.getI64Type())
-                       .cast<mlir::LLVM::LLVMType>();
-
     mlir::Value res =
         rewriter.create<mlir::LLVM::UndefOp>(op.getLoc(), llvmArrayType);
     res = rewriter.create<mlir::LLVM::InsertValueOp>(
@@ -227,10 +224,9 @@ public:
         op.getLoc(), rewriter.getRemappedValue(res),
         rewriter.getRemappedValue(op.length()), rewriter.getIndexArrayAttr(0));
 
-    for (int i = 0; i < op.columns().size(); i++) {
+    for (size_t i = 0; i < op.columns().size(); i++) {
       res = rewriter.create<mlir::LLVM::InsertValueOp>(
-          op.getLoc(), res,
-          rewriter.getRemappedValue(op.columns()[i]),
+          op.getLoc(), res, rewriter.getRemappedValue(op.columns()[i]),
           rewriter.getIndexArrayAttr(1 + i));
     }
 

@@ -17,6 +17,7 @@ GetLengthFromParent::matchAndRewrite(GetLengthOp op,
                                op.getLoc(), rewriter.getIndexType(),
                                getColumnOp.recordBatch())});
   }
+  return mlir::success();
 }
 
 GetDataBufferFromParent::GetDataBufferFromParent(mlir::MLIRContext *context)
@@ -28,6 +29,7 @@ mlir::LogicalResult GetDataBufferFromParent::matchAndRewrite(
   if (auto makeArrayOp = mlir::dyn_cast<MakeArrayOp>(array.getDefiningOp())) {
     rewriter.replaceOp(op, makeArrayOp.data_buffer());
   }
+  return mlir::success();
 }
 
 GetNullBitmapFromParent::GetNullBitmapFromParent(mlir::MLIRContext *context)
@@ -39,5 +41,6 @@ mlir::LogicalResult GetNullBitmapFromParent::matchAndRewrite(
   if (auto makeArrayOp = mlir::dyn_cast<MakeArrayOp>(array.getDefiningOp())) {
     rewriter.replaceOp(op, makeArrayOp.null_bitmap());
   }
+  return mlir::success();
 }
 } // namespace arcise::dialects::arrow
