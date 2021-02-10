@@ -16,7 +16,10 @@ void arcise::dialects::arrow::ArrowDialect::initialize() {
 }
 
 namespace arcise::dialects::arrow {
-mlir::Type ArrowDialect::parseType(mlir::DialectAsmParser &parser) const {}
+mlir::Type ArrowDialect::parseType(mlir::DialectAsmParser &parser) const {
+  assert(false);
+  return nullptr;
+}
 
 void ArrowDialect::printType(mlir::Type type,
                              mlir::DialectAsmPrinter &printer) const {
