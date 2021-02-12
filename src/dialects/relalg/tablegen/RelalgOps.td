@@ -7,6 +7,19 @@ include "mlir/IR/OpBase.td"
 
 def AnyNumericType : AnyTypeOf<[I8, I16, I32, I64, F32, F64]>;
 
+// def Relalg_ProjectionOp : Relalg_Op<"projection", [NoSideEffect]> {
+//     let summary = [{
+//         ...
+//     }];
+//     let description = [{
+//         ...
+//     }];
+//
+//     // TODO
+//     let arguments = (ins Relalg_RelationType:$lhs, Relalg_PredicateType:$rhs);
+//     let results = (outs Relalg_RelationType:$res);
+// }
+
 // TODO
 
 #endif // TABLEGEN_RELALG_OPS
