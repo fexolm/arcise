@@ -9,6 +9,10 @@ def Relalg_Dialect : Dialect {
     let cppNamespace = "arcise::dialects::relalg";
 }
 
-// TODO
+class Relalg_Op<string mnemonic, list<OpTrait> traits = []> :
+    Op<Relalg_Dialect, mnemonic, traits>;
+
+def Relalg_IsRelationType : CPred<"$_self.isa<arcise::dialects::relalg::RelationType>()">;
+def Relalg_RelationType : DialectType<Relalg_Dialect, Relalg_IsRelationType, "Relation type">;
 
 #endif // TABLEGEN_RELALG_DIALECT

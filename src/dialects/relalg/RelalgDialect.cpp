@@ -1,6 +1,6 @@
 #include "dialects/relalg/RelalgDialect.h"
 #include "dialects/relalg/RelalgOps.h"
-// #include "dialects/relalg/Relalgtypes.h"
+#include "dialects/relalg/RelalgTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/StandardTypes.h"
@@ -12,6 +12,7 @@ void arcise::dialects::relalg::RelalgDialect::initialize() {
 #undef GET_OP_LIST
 
       >();
+  addTypes<RelationType>();
 }
 namespace arcise::dialects::relalg {
     // TODO

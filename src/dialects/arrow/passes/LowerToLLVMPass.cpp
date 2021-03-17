@@ -11,7 +11,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
 
-#include <ranges>
+// #include <ranges>
 
 // TODO: replace i64 type to index type where neccesary
 

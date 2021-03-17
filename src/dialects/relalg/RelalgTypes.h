@@ -4,7 +4,20 @@
 #include "mlir/IR/Types.h"
 
 namespace arcise::dialects::relalg {
-struct RelationType;
-struct PredicateType;
+namespace detail {
+class RelationTypeStorage;
+} // namespace detail
 
+struct PredicateType; // TODO
+
+struct RelationType : public mlir::Type::TypeBase<RelationType, mlir::Type,
+                                               detail::RelationTypeStorage> {
+  using Base::Base;
+  using ImplType = detail::RelationTypeStorage;
+
+  static RelationType get(mlir::MLIRContext *ctx, mlir::ArrayRef<mlir::Type>, mlir::ArrayRef<std::string>);
+
+  mlir::ArrayRef<mlir::Type> getColTypes(void) const;
+  mlir::ArrayRef<std::string> getColNames(void) const;
+};
 } // namespace arcise::dialects::relalg

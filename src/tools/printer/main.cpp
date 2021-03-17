@@ -12,6 +12,10 @@
 #include "dialects/arrow/ArrowOps.h"
 #include "dialects/arrow/ArrowTypes.h"
 #include "dialects/arrow/passes/Passes.h"
+#include "dialects/relalg/RelalgDialect.h"
+#include "dialects/relalg/RelalgOps.h"
+#include "dialects/relalg/RelalgTypes.h"
+// #include "dialects/relalg/passes/Passes.h"
 #include <iostream>
 
 #include "llvm/ADT/StringRef.h"
@@ -69,11 +73,13 @@ int main(int argc, char **argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "arcise\n");
 
   namespace AD = arcise::dialects::arrow;
+  namespace RAD = arcise::dialects::relalg;
   mlir::registerAllPasses();
 
   mlir::DialectRegistry registry;
   mlir::registerAllDialects(registry);
   registry.insert<AD::ArrowDialect>();
+  registry.insert<RAD::RelalgDialect>();
 
   mlir::MLIRContext ctx;
 
@@ -100,6 +106,10 @@ int main(int argc, char **argv) {
 
   mlir::Type I1Array = builder.getType<AD::ArrayType>(builder.getI1Type());
   mlir::Type I64Array = builder.getType<AD::ArrayType>(builder.getI64Type());
+
+  // TODO
+  // using `getI1Type` just for now
+  mlir::Type IRelationType = builder.getType<RAD::RelationType>(builder.getI1Type());
 
   auto inputType = AD::RecordBatchType::get(&ctx, {"a", "b", "c"},
                                             {I64Array, I64Array, I64Array});
