@@ -21,11 +21,11 @@ struct RelationTypeStorage : public mlir::TypeStorage {
 };
 } // namespace detail
 
-// RelationType RelationType::get(mlir::MLIRContext *ctx, mlir::ArrayRef<mlir::Type>, mlir::ArrayRef<std::string>) {
-//   return Base::get(ctx, elementType);
-// }
+RelationType RelationType::get(mlir::MLIRContext *ctx, mlir::ArrayRef<mlir::Type>, mlir::ArrayRef<std::string>) {
+  return Base::get(ctx, elementType);
+}
 
-// mlir::ArrayRef<mlir::Type> RelationType::getColTypes(void) const { return; } // TODO
-// mlir::ArrayRef<std::string> RelationType::getColNames(void) const { return; } // TODO
+mlir::ArrayRef<mlir::Type> RelationType::getColTypes(void) const { return; }
+mlir::ArrayRef<std::string> RelationType::getColNames(void) const { return; }
 
 } // namespace arcise::dialects::relalg

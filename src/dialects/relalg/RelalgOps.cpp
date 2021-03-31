@@ -1,7 +1,7 @@
 #include "dialects/relalg/RelalgOps.h"
-// #include "dialects/relalg/RelalgDialect.h"
-// #include "dialects/relalg/RelalgTypes.h"
-// #include "dialects/relalg/transforms/
+#include "dialects/relalg/RelalgDialect.h"
+#include "dialects/relalg/RelalgTypes.h"
+#include "dialects/relalg/transforms/
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/StandardTypes.h"
@@ -11,6 +11,9 @@
 
 namespace arcise::dialects::relalg {
 
-    // TODO
+void relalg::getProjectionOp(
+    mlir::OwningRewritePatternList &results, mlir::MLIRContext *context) {
+  results.insert<GetNullBitmapFromParent>(context);
+}
 
 } // namespace arcise::dialects::relalg

@@ -8,7 +8,7 @@ namespace detail {
 class RelationTypeStorage;
 } // namespace detail
 
-struct PredicateType; // TODO
+struct PredicateType;
 
 struct RelationType : public mlir::Type::TypeBase<RelationType, mlir::Type,
                                                detail::RelationTypeStorage> {
