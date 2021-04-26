@@ -196,13 +196,14 @@ struct ArrowToAffineLoweringPass
 
     target.addIllegalDialect<ArrowDialect>();
     // target.addLegalOp<FilterOp>();
-    target.addLegalOp<GetColumnOp>();
+    target.addLegalOp<FetchColumnOp>();
     target.addLegalOp<MakeArrayOp>();
     target.addLegalOp<GetDataBufferOp>();
     target.addLegalOp<GetNullBitmapOp>();
     target.addLegalOp<GetLengthOp>();
     target.addLegalOp<GetRowsCountOp>();
     target.addLegalOp<MakeRecordBatchOp>();
+    target.addLegalOp<GetRecordBatchOp>();
 
     mlir::OwningRewritePatternList patterns;
     patterns.insert<ArrowEqOpLowering, ArrowNeqOpLowering, ArrowGeOpLowering,

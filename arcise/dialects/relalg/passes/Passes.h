@@ -5,5 +5,5 @@
 #include <memory>
 
 namespace arcise::dialects::relalg {
-std::unique_ptr<mlir::Pass> createLowerToAffinePass();
+std::unique_ptr<mlir::Pass> createLowerToArrowPass();
 } // namespace arcise::dialects::relalg

@@ -38,4 +38,6 @@ Array *make_array(MemRef null_bitmap, MemRef data_buffer, size_t len) {
 RecordBatch *make_record_batch(size_t length) {
   return new RecordBatch{length, new int8_t *[length]};
 }
+
+RecordBatch *get_record_batch(char *name) { return nullptr; }
 }

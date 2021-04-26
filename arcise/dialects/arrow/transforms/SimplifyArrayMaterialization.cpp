@@ -11,11 +11,11 @@ GetLengthFromParent::matchAndRewrite(GetLengthOp op,
   if (auto makeArrayOp = mlir::dyn_cast<MakeArrayOp>(array.getDefiningOp())) {
     rewriter.replaceOp(op, {rewriter.create<mlir::DimOp>(
                                op.getLoc(), makeArrayOp.data_buffer(), 0)});
-  } else if (auto getColumnOp =
-                 mlir::dyn_cast<GetColumnOp>(array.getDefiningOp())) {
+  } else if (auto fetchColumnOp =
+                 mlir::dyn_cast<FetchColumnOp>(array.getDefiningOp())) {
     rewriter.replaceOp(op, {rewriter.create<GetRowsCountOp>(
                                op.getLoc(), rewriter.getIndexType(),
-                               getColumnOp.recordBatch())});
+                               fetchColumnOp.recordBatch())});
   }
   return mlir::success();
 }

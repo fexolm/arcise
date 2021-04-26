@@ -102,12 +102,12 @@ int main(int argc, char **argv) {
   mlir::Type I1Array = builder.getType<AD::ArrayType>(builder.getI1Type());
   mlir::Type I64Array = builder.getType<AD::ArrayType>(builder.getI64Type());
 
-  auto inputType = AD::RecordBatchType::get(&ctx, {"a", "b", "c"},
-                                            {I64Array, I64Array, I64Array});
+  auto rbType = AD::RecordBatchType::get(&ctx, {"a", "b", "c"},
+                                         {I64Array, I64Array, I64Array});
 
   auto outputType = AD::RecordBatchType::get(&ctx, {"res"}, {I1Array});
 
-  auto func = builder.getFunctionType({inputType}, {outputType});
+  auto func = builder.getFunctionType({}, {outputType});
 
   auto funcOp = builder.create<mlir::FuncOp>(loc, "f", func);
 
@@ -115,13 +115,13 @@ int main(int argc, char **argv) {
 
   builder.setInsertionPointToStart(block);
 
-  auto input = funcOp.getArgument(0);
+  auto rb = builder.create<AD::GetRecordBatchOp>(loc, rbType, "col1");
 
-  auto c1 = builder.create<AD::GetColumnOp>(loc, I64Array, input, "a");
+  auto c1 = builder.create<AD::FetchColumnOp>(loc, I64Array, rb, "a");
 
-  auto c2 = builder.create<AD::GetColumnOp>(loc, I64Array, input, "b");
+  auto c2 = builder.create<AD::FetchColumnOp>(loc, I64Array, rb, "b");
 
-  auto c3 = builder.create<AD::GetColumnOp>(loc, I64Array, input, "c");
+  auto c3 = builder.create<AD::FetchColumnOp>(loc, I64Array, rb, "c");
 
   mlir::Value res = builder.create<AD::SumOp>(loc, I64Array, c1, c2);
 

@@ -100,12 +100,12 @@ mlir::Value getLLVMIndexConstant(mlir::OpBuilder &builder,
       builder.getIndexAttr(value));
 }
 
-class GetColumnOpConvertionPattern
-    : public mlir::OpConversionPattern<GetColumnOp> {
+class FetchColumnOpConvertionPattern
+    : public mlir::OpConversionPattern<FetchColumnOp> {
 public:
   using OpConversionPattern::OpConversionPattern;
   mlir::LogicalResult
-  matchAndRewrite(GetColumnOp op, mlir::ArrayRef<mlir::Value> operands,
+  matchAndRewrite(FetchColumnOp op, mlir::ArrayRef<mlir::Value> operands,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto rb = op.recordBatch();
     auto columnName = op.columnName();
@@ -276,6 +276,31 @@ public:
   }
 };
 
+class GetRecordBatchOpConvertionPattern
+    : public mlir::OpConversionPattern<GetRecordBatchOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(GetRecordBatchOp op, mlir::ArrayRef<mlir::Value> operands,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+
+    auto llvmRBType = typeConverter->convertType(op.res().getType());
+
+    auto tableName =
+        mlir::LLVM::createGlobalString(op.getLoc(), rewriter, op.name(),
+                                       op.name(), mlir::LLVM::Linkage::Private);
+
+    rewriter.replaceOp(
+        op, generateFunctionCall(
+                rewriter, *typeConverter, op->getParentOfType<mlir::ModuleOp>(),
+                op.getLoc(), "get_record_batch", llvmRBType, {tableName})
+                .getResult(0));
+
+    return mlir::success();
+  }
+};
+
 struct ArrowAffineToLLVMLoweringPass
     : public mlir::PassWrapper<ArrowAffineToLLVMLoweringPass,
                                mlir::OperationPass<mlir::ModuleOp>> {
@@ -298,11 +323,12 @@ struct ArrowAffineToLLVMLoweringPass
     target.addIllegalDialect<ArrowDialect>();
 
     mlir::OwningRewritePatternList patterns;
-    patterns
-        .insert<GetColumnOpConvertionPattern, GetDataBufferOpConvertionPattern,
-                GetNullBitmapOpConvertionPattern, GetLengthOpConvertionPattern,
-                GetRowsCountOpConvertionPattern, MakeArrayOpConvertionPattern,
-                MakeRecordBatchOpConvertionPattern>(converter, ctx);
+    patterns.insert<
+        FetchColumnOpConvertionPattern, GetDataBufferOpConvertionPattern,
+        GetNullBitmapOpConvertionPattern, GetLengthOpConvertionPattern,
+        GetRowsCountOpConvertionPattern, MakeArrayOpConvertionPattern,
+        MakeRecordBatchOpConvertionPattern, GetRecordBatchOpConvertionPattern>(
+        converter, ctx);
 
     mlir::populateAffineToStdConversionPatterns(patterns, ctx);
     mlir::populateLoopToStdConversionPatterns(patterns, ctx);

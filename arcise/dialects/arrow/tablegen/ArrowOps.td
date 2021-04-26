@@ -112,7 +112,7 @@ def Arrow_OrOp : Arrow_Op<"or", [NoSideEffect]> {
 
 // ==== OTHER OPERATIONS ====
 
-def Arrow_GetColumnOp : Arrow_Op<"get_column", [NoSideEffect]> {
+def Arrow_FetchColumnOp : Arrow_Op<"get_column", [NoSideEffect]> {
     let summary = [{
         return column by name from record batch 
     }];
@@ -168,6 +168,11 @@ def Arrow_MakeRecordBatchOp : Arrow_Op<"make_recordbatch", [NoSideEffect]> {
         make recordbatch from arrays
     }];
     let arguments = (ins Index: $length, Variadic<Arrow_AnyArrayType>: $columns);
+    let results = (outs Arrow_RecordBatchType: $res);
+}
+
+def Arrow_GetRecordBatchOp : Arrow_Op<"get_recordbatch", [NoSideEffect]> {
+    let arguments = (ins StrAttr: $name);
     let results = (outs Arrow_RecordBatchType: $res);
 }
 

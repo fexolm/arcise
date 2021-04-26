@@ -16,7 +16,7 @@ RUN cmake -G Ninja ../llvm \
    -DLLVM_ENABLE_ASSERTIONS=ON \
    -DLLVM_INSTALL_UTILS=ON
 
-RUN cmake --build . --target install -j 2
+RUN cmake --build . --target install -j
 
 # installing some development tools here in order to avoid rebuilding dependencies after
 # after each tool would be added
@@ -28,7 +28,7 @@ RUN git clone https://github.com/apache/arrow.git -b apache-arrow-1.0.1
 RUN mkdir /arrow/cpp/build
 WORKDIR /arrow/cpp/build
 RUN cmake -DCMAKE_BUILD_TYPE=Debug ..
-RUN cmake --build . --target install -j 4
+RUN cmake --build . --target install -j
 
 RUN apt-get update && apt-get install -y neovim ccls fzf ripgrep nodejs npm tmux libboost-all-dev
 
